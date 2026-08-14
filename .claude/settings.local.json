@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -)",
+      "Bash(flutter analyze *)",
+      "Bash(flutter test *)",
+      "Bash(python3 -c \"import stripe; print\\(stripe.__version__\\)\")",
+      "Bash(python3 -m pytest --version)",
+      "Bash(pip show *)",
+      "Bash(python3 -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(./venv/bin/python -m pip index versions stripe)",
+      "Bash(./venv/bin/python -m pip show stripe)"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+# COPY this file to `android/key.properties` and fill in your real values.
+# `android/key.properties` is git-ignored so secrets never reach source control.
+# Generate the keystore once with:
+#
+#   keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA \
+#       -keysize 2048 -validity 10000 -alias upload
+#
+# (place the resulting upload-keystore.jks in android/app/)
+storeFile=upload-keystore.jks
+storePassword=CHANGE_ME
+keyAlias=upload
+keyPassword=CHANGE_ME
