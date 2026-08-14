@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "geonix-wrench-REPLACE_ME",
+    "storage_bucket": "geonix-wrench-REPLACE_ME.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "android_client_info": {
+          "package_name": "com.geonixsoftware.wrench"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "000000000000-REPLACE_ME.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "REPLACE_ME_WITH_REAL_FIREBASE_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "000000000000-REPLACE_ME.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

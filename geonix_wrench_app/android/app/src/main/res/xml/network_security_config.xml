@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Hard lock: no cleartext (HTTP) traffic is permitted app-wide. All
+         backend communication must use HTTPS. This is the OS-level backstop
+         for the HTTPS migration in lib/core/config/app_config.dart. -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

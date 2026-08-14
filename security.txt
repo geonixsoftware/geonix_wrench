@@ -1,0 +1,78 @@
+Geonix Wrench Security Audit - 2026-08-13
+
+Summary of findings (high-level):
+- Critical secret exposure: backend .env committed with live API keys and webhook secret.
+- Overly permissive CORS in FastAPI (allow_origins=['*']).
+- Some endpoints lack robust upload size checks (audio uploads).
+- LLM prompt & PDF inputs use raw user/model text without length/sanitization limits.
+- No .gitignore present at repo root/backend; venv/ is committed.
+
+Detailed findings & evidence:
+1) Environment variables & API keys
+- Evidence: geonix_wrench_backend/.env contains ANTHROPIC_API_KEY, STRIPE_API_KEY (live), STRIPE_WEBHOOK_SECRET, etc.
+  - file: geonix_wrench_backend/.env (lines show keys)
+- Evidence: config.py loads dotenv (load_dotenv()) and reads ANTHROPIC_API_KEY, STRIPE_API_KEY, STRIPE_WEBHOOK_SECRET via os.getenv.
+  - file: geonix_wrench_backend/config.py
+- Risk: Secret exfiltration from source repo and any clones. Live Stripe key and webhook secret are extremely sensitive and should be rotated immediately.
+
+Remediation (env & keys):
+- Immediately remove geonix_wrench_backend/.env from version control (git rm --cached) and rotate all exposed secrets (Anthropic key, Stripe API key, Stripe webhook secret, any other secrets).
+- Add at least: /.env, /geonix_wrench_backend/.env, /geonix_wrench_backend/venv/, firebase-service-account.json, and other credentials to .gitignore at repo root and backend.
+- Use environment variables or a secrets manager (HashiCorp Vault, cloud secret manager, GitHub Actions secrets) for production.
+- Purge keys from commit history (git filter-repo or BFG) if repository was shared publicly.
+
+2) FastAPI endpoints & CORS
+- Evidence: main.py sets CORSMiddleware with allow_origins=["*"] and allow_methods/headers=["*"] (geonix_wrench_backend/main.py lines 71-77).
+  - file: geonix_wrench_backend/main.py
+- Evidence: Stripe webhook handling uses stripe.Webhook.construct_event with STRIPE_WEBHOOK_SECRET in billing.py (good), and main webhook route uses raw body and signature header (good).
+  - file: geonix_wrench_backend/billing.py and geonix_wrench_backend/main.py
+- Risk: Wildcard CORS allows any origin to perform requests (esp. if allow_credentials=True). This increases attack surface and token theft risk in browsers.
+
+Remediation (CORS & webhook):
+- Replace allow_origins=["*"] with a production list from env (e.g., ALLOWED_ORIGINS env variable) and explicitly list trusted production domains. Keep wildcard only for local dev.
+- Keep allow_credentials=False or restrict to required origins; avoid combining allow_credentials=True with allow_origins=["*"] in production.
+- Confirm Stripe webhook code uses stripe.Webhook.construct_event (it does). Ensure STRIPE_WEBHOOK_SECRET is rotated and only present in environment/secret manager.
+
+3) Authentication & input validation
+- Evidence: Most user routes depend on get_current_user (Firebase token via HTTPBearer) — auth.py verifies Firebase tokens (good).
+  - file: geonix_wrench_backend/auth.py
+- Evidence: process-audio endpoint validates file extension but does NOT enforce a max audio upload size before reading file into temp (main.py lines ~136-174). Logo upload has size limit (MAX_LOGO_SIZE_BYTES) and extension check (good).
+  - file: geonix_wrench_backend/main.py and config.py
+- Evidence: PDF generator puts jobcard fields directly into Paragraph() (reportlab) and uses parts/jobcard fields without explicit length limits; LLM extraction uses raw transcript in prompts.
+  - files: geonix_wrench_backend/pdf_generator.py, geonix_wrench_backend/extraction.py
+- Risks: Large or maliciously crafted uploads may cause resource exhaustion; unsanitized/long inputs may break PDF generation or LLM prompting (prompt injection or malformed outputs). Regex-based JSON extraction from LLM output is brittle and can be manipulated.
+
+Remediation (auth & validation):
+- Enforce server-side maximum upload sizes for audio (e.g., MAX_AUDIO_BYTES env var). Validate content-length header where possible, use ASGI/gunicorn/body size limits, and reject before buffering entire file.
+- Validate MIME type in addition to extension and limit accepted encodings. Stream uploads to disk with enforced quotas.
+- For PDF inputs (vehicle_info, work_performed, parts_used): enforce maximum string lengths, maximum number of parts, and sanitize control/unicode characters. Escape or truncate before passing to reportlab Paragraph.
+- For LLM inputs: enforce transcript length caps, strip or neutralize embedded instruction-like patterns if feasible, and always validate model outputs strictly against the JSON schema (currently done via pydantic — keep this). Improve _extract_json_block parsing to be robust; log and reject non-conforming outputs.
+
+4) Other repository hygiene
+- Evidence: geonix_wrench_backend/venv exists and site-packages are present. No .gitignore files found at repo root or backend to exclude venv and credentials.
+- Risk: Committed venv increases leak surface and repository size; committed secrets in .env are present.
+
+Remediation (repo hygiene):
+- Remove venv directory from repo history and add venv/ to .gitignore. Use virtualenv locally; do not commit site-packages.
+- Add a clear .gitignore at repo root listing common entries: .env, *.env, venv/, __pycache__/, .pytest_cache/, *.pyc, firebase-service-account.json, .DS_Store, and build artifacts.
+- Rotate keys and run a secret-scan across commit history.
+
+Action checklist (prioritized):
+1. Revoke/rotate Anthropic key, Stripe API key, Stripe webhook secret immediately.
+2. Remove geonix_wrench_backend/.env from repository (git rm --cached) and add to .gitignore.
+3. Remove committed venv/ from repo and add to .gitignore; consider cleaning history if repo was published.
+4. Restrict CORS to trusted origins via env variable and set allow_credentials appropriately.
+5. Add MAX_AUDIO_SIZE_BYTES and enforce pre-read checks; implement streaming/size-enforced upload handling.
+6. Add input length caps and sanitization for jobcard fields before PDF generation. Harden LLM output parsing and validate strictly.
+7. Move all secrets to a secret manager and CI environment variables; avoid any plaintext keys in source.
+8. Run a full repo secret-scan and, if public exposure occurred, notify stakeholders and follow key revocation steps.
+
+Notes (good practices observed):
+- Firebase token verification (auth.get_current_user) is in place for user routes.
+- Stripe webhook verification via construct_event is implemented in billing.handle_webhook_event.
+- reportlab usage is contained to a single module (easier to harden).
+- Pydantic schema validation is used to validate LLM-extracted JSON (keeps some safety guard).
+
+If desired, next steps can include an automated secrets scan commit hook, CI secret gating, and code changes to implement the upload limits and CORS env-based config. I performed only READ-ONLY checks and cited exact files/lines where relevant.
+
+End of audit.
