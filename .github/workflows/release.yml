@@ -113,6 +113,9 @@ jobs:
         working-directory: geonix_wrench_app
         env:
           CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+          # CMake seeds CMAKE_CXX_FLAGS from CXXFLAGS on first configure, which
+          # is every run here since CI always starts from a clean checkout.
+          CXXFLAGS: "/SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS /std:c++20"
         run: |
           flutter pub get
           flutter build windows --release
@@ -174,6 +177,7 @@ jobs:
         env:
           CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: |
+          flutter clean
           flutter pub get
           flutter build linux --release
 
