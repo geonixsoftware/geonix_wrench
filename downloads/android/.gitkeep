@@ -1,0 +1,2 @@
+Google Play build. flutter build appbundle --release -> geonix-wrench-<version>-android.aab
+Optional sideload copy: flutter build apk --release -> geonix-wrench-<version>-android.apk

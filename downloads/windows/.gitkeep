@@ -1,0 +1,1 @@
+Build on a Windows host: flutter build windows --release -> package into geonix-wrench-<version>-windows.exe

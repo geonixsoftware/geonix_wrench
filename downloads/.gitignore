@@ -1,0 +1,21 @@
+# Release binaries are published on GitHub Releases, never committed —
+# they are large, they change every build, and git has no way to prune them.
+*.dmg
+*.exe
+*.msi
+*.msix
+*.deb
+*.rpm
+*.AppImage
+*.apk
+*.aab
+*.ipa
+*.zip
+*.tar.gz
+*.pkg
+
+# Keep the folder structure, the docs and the checksum files.
+!.gitignore
+!README.md
+!*.sha256
+!.gitkeep
