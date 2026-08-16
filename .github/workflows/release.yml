@@ -66,8 +66,19 @@ jobs:
           channel: stable
           cache: true
 
+      # Built unsigned. `flutter build macos` has no --no-codesign flag (that
+      # is iOS-only, and passing it here is a hard argument-parse error), so
+      # signing is turned off the supported way: flutter_tools forwards any
+      # FLUTTER_XCODE_<SETTING> env var to xcodebuild as a build-setting
+      # override. This sidesteps the Automatic/DEVELOPMENT_TEAM K4XDZQ5WXW
+      # config in the Xcode project, which cannot resolve on a runner that has
+      # no certificates in its keychain.
       - name: Build
         working-directory: geonix_wrench_app
+        env:
+          FLUTTER_XCODE_CODE_SIGNING_ALLOWED: "NO"
+          FLUTTER_XCODE_CODE_SIGNING_REQUIRED: "NO"
+          FLUTTER_XCODE_CODE_SIGN_IDENTITY: ""
         run: |
           flutter pub get
           flutter build macos --release
