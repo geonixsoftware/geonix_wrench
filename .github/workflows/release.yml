@@ -22,13 +22,6 @@ on:
         required: true
 
 env:
-  # Release assets are published to the *public* website repo, not to this one.
-  # Assets on a private repo are not downloadable without a token, which would
-  # break every download link on the site. Needs a RELEASE_TOKEN secret: a PAT
-  # with `contents: write` on the target repo (GITHUB_TOKEN cannot write to
-  # another repository).
-  RELEASE_REPO: geonixsoftware/geonix
-
   # Pinned rather than floating on `stable`. Run #3 resolved five SDK-pinned
   # packages away from the committed pubspec.lock (intl, matcher, meta,
   # test_api, vector_math), which only happens when CI is on a newer SDK than
@@ -278,6 +271,11 @@ jobs:
     # job that does not exist makes the whole workflow fail to parse.
     needs: [version, macos, windows]
     runs-on: ubuntu-latest
+    # Scoped to this job rather than the whole workflow: only the release step
+    # writes anything, and the three build jobs have no reason to hold a
+    # write-capable token.
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -297,10 +295,16 @@ jobs:
       # Created as a draft on purpose: the site's download links point at these
       # URLs, so nothing should be reachable until someone has installed each
       # build on a clean machine and pressed Publish.
+      #
+      # The release now lands in THIS repo. GITHUB_TOKEN is scoped to the
+      # repository running the workflow, so the previous cross-repo
+      # `repository: geonixsoftware/geonix` had to go with it — kept together,
+      # every run would 403. That moves the asset URLs to
+      # /geonixsoftware/geonix_wrench/releases/download/..., which is not what
+      # the website currently links to.
       - uses: softprops/action-gh-release@v2
         with:
-          repository: ${{ env.RELEASE_REPO }}
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: v${{ needs.version.outputs.version }}
           name: Geonix Wrench ${{ needs.version.outputs.version }}
           draft: true
