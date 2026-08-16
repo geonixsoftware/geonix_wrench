@@ -100,8 +100,19 @@ jobs:
           channel: stable
           cache: true
 
+      # windows/CMakeLists.txt still declares cmake_minimum_required(VERSION
+      # 3.14), and CMake 4.x refuses anything below 3.5 outright. `flutter
+      # build windows` invokes CMake itself and forwards no -D flags, so the
+      # policy floor goes in through the environment variable CMake reads into
+      # the same cache entry as -DCMAKE_POLICY_VERSION_MINIMUM=3.5.
+      #
+      # This is a workaround, not a fix: bumping cmake_minimum_required in
+      # windows/CMakeLists.txt and windows/runner/CMakeLists.txt is what
+      # actually resolves it, and lets this env block go away.
       - name: Build
         working-directory: geonix_wrench_app
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: |
           flutter pub get
           flutter build windows --release
@@ -153,8 +164,15 @@ jobs:
           channel: stable
           cache: true
 
+      # Same CMake 4.x policy floor as the Windows job — linux/CMakeLists.txt
+      # declares cmake_minimum_required(VERSION 3.13), which is below 3.5 as
+      # far as CMake 4 is concerned, and `flutter build linux` forwards no -D
+      # flags either. Bumping cmake_minimum_required in linux/CMakeLists.txt
+      # and linux/runner/CMakeLists.txt is what removes the need for this.
       - name: Build
         working-directory: geonix_wrench_app
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: |
           flutter pub get
           flutter build linux --release
