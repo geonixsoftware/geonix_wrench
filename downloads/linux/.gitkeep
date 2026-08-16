@@ -1,0 +1,1 @@
+Build on a Linux host: flutter build linux --release -> package into geonix-wrench-<version>-linux.deb

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Geonix Wrench
+GenericName=Job Card Recorder
+Comment=Record what was done on a vehicle and get back a structured job card
+Exec=/opt/geonix-wrench/geonix_wrench_app
+Icon=com.geonixsoftware.wrench
+Terminal=false
+Categories=Office;Utility;
+Keywords=job card;garage;mechanic;repair;voice;
+StartupWMClass=geonix_wrench_app
