@@ -85,8 +85,10 @@ class UserProfileService {
     return UserProfile.fromJson(_decodeMap(response));
   }
 
-  Future<Organization> createOrganization(String name, int seatLimit) async {
-    final response = await _post('/api/organizations', {'name': name, 'seat_limit': seatLimit});
+  /// Creates the shop. Only the name is sent: the seat limit is whatever the
+  /// owner's Team subscription paid for, and the server is the one that knows.
+  Future<Organization> createOrganization(String name) async {
+    final response = await _post('/api/organizations', {'name': name});
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw UserProfileException(_detailFrom(response));
     }

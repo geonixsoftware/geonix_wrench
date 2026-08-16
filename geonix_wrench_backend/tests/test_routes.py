@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 import auth
 import database
+from config import TEAM_MIN_SEATS
 from main import app
 
 
@@ -41,12 +42,14 @@ def test_create_organization_route(temp_db):
     owner = _make_user("orgroute@example.com")
     client = _make_client(temp_db, owner["id"])
 
+    # seat_limit is deliberately ignored if sent: the shop gets the seats its
+    # owner paid for, and with no Team subscription that is the plan minimum.
     resp = client.post("/api/organizations", json={"name": "Route Shop", "seat_limit": 3})
     assert resp.status_code == 200
     body = resp.json()
     assert body["name"] == "Route Shop"
     assert body["seat_used"] == 1
-    assert body["seat_limit"] == 3
+    assert body["seat_limit"] == TEAM_MIN_SEATS
 
     resp2 = client.get("/api/organizations/me")
     assert resp2.status_code == 200

@@ -25,6 +25,13 @@ env:
   # another repository).
   RELEASE_REPO: geonixsoftware/geonix
 
+  # Pinned rather than floating on `stable`. Run #3 resolved five SDK-pinned
+  # packages away from the committed pubspec.lock (intl, matcher, meta,
+  # test_api, vector_math), which only happens when CI is on a newer SDK than
+  # the lock was written against — so the release was never built from the
+  # dependency set anyone had tested. 3.47.0 is what the lock matches.
+  FLUTTER_VERSION: "3.47.0"
+
 jobs:
   version:
     name: Resolve version
@@ -51,6 +58,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -97,6 +105,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -113,9 +122,15 @@ jobs:
         working-directory: geonix_wrench_app
         env:
           CMAKE_POLICY_VERSION_MINIMUM: "3.5"
-          # CMake seeds CMAKE_CXX_FLAGS from CXXFLAGS on first configure, which
-          # is every run here since CI always starts from a clean checkout.
-          CXXFLAGS: "/SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS /std:c++20"
+          # permission_handler_windows pulls in <experimental/coroutine>, which
+          # MSVC 14.51 turns into a hard error (STL1011). This is the macro the
+          # error text itself names — it needs /D, and the leading underscore.
+          #
+          # /std:c++20 was tried here and does nothing: APPLY_STANDARD_SETTINGS
+          # in windows/CMakeLists.txt:41 appends /std:c++17 per target, after
+          # CMAKE_CXX_FLAGS, and the last standard flag on the cl command line
+          # wins. Fixing the standard means editing that line, not this one.
+          CXXFLAGS: "/D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
         run: |
           flutter pub get
           flutter build windows --release
@@ -164,6 +179,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 

@@ -12,7 +12,20 @@
 	<true/>
 	<key>com.apple.security.device.audio-input</key>
 	<true/>
-	<key>com.apple.security.files.user-selected.read-only</key>
+	<!-- Required by Firebase Auth: it stores the session in Apple's
+	     data-protection keychain (kSecUseDataProtectionKeychain = true), which
+	     only grants an access group to a signature backed by a provisioning
+	     profile. Declaring this key is what makes Xcode fetch and embed that
+	     profile. Keep the $(AppIdentifierPrefix) macro — Xcode expands it to the
+	     team ID at build time; a hardcoded value or a raw `codesign` invocation
+	     produces an unauthorized entitlement and the app is SIGKILLed at launch. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.geonixsoftware.wrench</string>
+	</array>
+	<key>com.apple.security.files.downloads.read-write</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 </dict>
 </plist>

@@ -78,5 +78,12 @@ class AppLogger {
       stackTrace: stackTrace,
       name: 'GeonixWrench',
     );
+    // `dev.log` only surfaces in DevTools / the IDE console — on desktop it does
+    // not reliably reach the `flutter run` terminal, which made these
+    // diagnostics effectively invisible. Mirror to debugPrint (already redacted,
+    // and stripped in release) so failures are visible where people look first.
+    if (!kReleaseMode) {
+      debugPrint('[$level] $message${safeError == null ? '' : ' | $safeError'}');
+    }
   }
 }

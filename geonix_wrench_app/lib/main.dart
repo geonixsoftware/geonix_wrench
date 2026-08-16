@@ -10,9 +10,15 @@ import 'core/services/user_profile_service.dart';
 import 'core/settings/app_settings.dart';
 import 'core/user/user_profile_controller.dart';
 import 'firebase_options.dart';
+import 'core/config/app_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Surface a missing backend host immediately, rather than letting every
+  // request fail later with an opaque connection error.
+  assertApiBaseUrlConfigured();
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   final settings = AppSettings();

@@ -1,0 +1,87 @@
+name: CI
+
+# The suites existed but nothing ran them, so a regression only showed up when
+# someone happened to run pytest or flutter test locally.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: geonix_wrench_backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: geonix_wrench_backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        # No secrets needed: every Stripe and Firebase call in the suite is
+        # monkeypatched, and the DB is a per-test temp file.
+        run: python -m pytest tests/ -q
+
+  app:
+    name: App (analyze + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: geonix_wrench_app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Fetch packages
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        # Goldens are excluded: their output depends on the Flutter version and
+        # host platform, so they fail on CI for reasons unrelated to the change.
+        # Refresh them locally with:
+        #   flutter test --update-goldens test/theme_specimen_test.dart
+        run: flutter test --exclude-tags golden
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan tracked files and history for credentials
+        run: |
+          set -e
+          PATTERN='sk_live_[A-Za-z0-9]|sk_test_[A-Za-z0-9]|whsec_[A-Za-z0-9]|sk-ant-api[0-9]'
+          echo "Scanning tracked files..."
+          if git grep -nIE "$PATTERN" -- . ':!security.txt' ':!RELEASE_TODO.txt'; then
+            echo "::error::A credential-shaped string is present in tracked files."
+            exit 1
+          fi
+          echo "Scanning history..."
+          if git grep -nIE "$PATTERN" $(git rev-list --all) -- . ':!security.txt' ':!RELEASE_TODO.txt'; then
+            echo "::error::A credential-shaped string is present in git history."
+            exit 1
+          fi
+          echo "Clean."

@@ -6,3 +6,8 @@ __pycache__/
 .DS_Store
 firebase-service-account.json
 geonix_website/
+
+# SQLite databases: the committed one held a real user row (email +
+# firebase_uid). Ship an empty schema and create the DB at first run.
+*.db
+*.sqlite3

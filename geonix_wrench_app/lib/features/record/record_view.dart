@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -11,14 +12,21 @@ import '../../core/l10n/app_strings.dart';
 import '../../core/models/job_card.dart';
 import '../../core/services/audio_upload_service.dart';
 import '../../core/services/recording_controller.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_header.dart';
+import '../../shared/widgets/block_layout.dart';
 import '../../shared/widgets/surface_card.dart';
 import '../job_card/job_card_review_view.dart';
 import 'widgets/audio_visualizer.dart';
 import 'widgets/record_button.dart';
 
 enum _UploadStage { none, uploading, error }
+
+String _formatDuration(Duration duration) {
+  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return '$minutes:$seconds';
+}
 
 class _RecentActivityEntry {
   _RecentActivityEntry({
@@ -48,6 +56,10 @@ class _RecordViewState extends State<RecordView> {
 
   _UploadStage _stage = _UploadStage.none;
   String? _pendingFilePath;
+
+  /// Whether the current error is one retrying cannot fix. Drives whether the
+  /// error screen offers a Retry button at all.
+  bool _errorIsPermanent = false;
 
   @override
   void initState() {
@@ -119,6 +131,8 @@ class _RecordViewState extends State<RecordView> {
 
     var succeeded = false;
     var paywallRequired = false;
+    var noSpeech = false;
+    var permanent = false;
     try {
       final jobCard = await _uploadService.uploadRecording(path);
       if (!mounted) return;
@@ -126,6 +140,7 @@ class _RecordViewState extends State<RecordView> {
       // Delete it immediately to avoid a storage leak (do this before leaving
       // this screen, since the user may never come back to the review view).
       await _controller.deleteRecording(path);
+      if (!mounted) return;
       _addRecentActivity(jobCard);
       await Navigator.of(context).push<void>(
         MaterialPageRoute(builder: (_) => JobCardReviewView(jobCard: jobCard)),
@@ -138,22 +153,43 @@ class _RecordViewState extends State<RecordView> {
         // Server-side gate rejected the request (HTTP 402) — surface the
         // subscription dialog regardless of the cached client-side state.
         paywallRequired = true;
+      } else if (e is AudioUploadException && e.isNoSpeech) {
+        // The recording held no speech, so re-sending the same bytes would
+        // fail identically. Offering "Retry" would only waste the user's
+        // time — this ends the attempt with an explanation instead.
+        noSpeech = true;
+        await _controller.deleteRecording(path);
       } else if (e is AudioUploadException && e.isTimeout) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(context.l10n.t(AppStrings.recordTimeoutError))),
           );
         }
+      } else if (e is AudioUploadException && e.isPermanent) {
+        // The server said this can never succeed. Keep the recording so it
+        // isn't lost, but don't offer a Retry that is guaranteed to fail.
+        permanent = true;
       }
     } finally {
       // Always leave the "uploading" state, even on an unexpected error,
-      // so the UI never gets stuck on the processing screen.
+      // so the UI never gets stuck on the processing screen. A recording with
+      // no speech in it returns to idle rather than the retryable error
+      // screen, since its file has already been discarded.
       if (mounted) {
+        final resolved = succeeded || noSpeech;
         setState(() {
-          _stage = succeeded ? _UploadStage.none : _UploadStage.error;
-          if (succeeded) _pendingFilePath = null;
+          _stage = resolved ? _UploadStage.none : _UploadStage.error;
+          if (resolved) _pendingFilePath = null;
+          _errorIsPermanent = permanent;
         });
       }
+    }
+
+    if (mounted && noSpeech) {
+      _controller.reset();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.t(AppStrings.recordNoSpeechError))),
+      );
     }
 
     if (mounted && paywallRequired) {
@@ -190,14 +226,9 @@ class _RecordViewState extends State<RecordView> {
     setState(() {
       _stage = _UploadStage.none;
       _pendingFilePath = null;
+      _errorIsPermanent = false;
     });
     _controller.reset();
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
   }
 
   String _formatRelativeTime(DateTime time) {
@@ -213,15 +244,19 @@ class _RecordViewState extends State<RecordView> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final p = context.palette;
     final theme = Theme.of(context);
-    final subscriptionActive = context.watch<BillingController>().isActive;
+    // isLocked (not !isActive) so the record button does not render disabled
+    // during the first status fetch and then snap enabled.
+    final subscriptionLocked = context.watch<BillingController>().isLocked;
 
     if (_stage == _UploadStage.uploading) {
       return _StatusView(
-        icon: const SizedBox(
-          width: 40,
-          height: 40,
-          child: CircularProgressIndicator(strokeWidth: 3),
+        headline: l10n.t(AppStrings.recordProcessingTitle),
+        icon: SizedBox(
+          width: 34,
+          height: 34,
+          child: CircularProgressIndicator(strokeWidth: 3, color: p.accent),
         ),
         title: l10n.t(AppStrings.recordProcessingTitle),
         subtitle: l10n.t(AppStrings.recordProcessingSubtitle),
@@ -229,22 +264,34 @@ class _RecordViewState extends State<RecordView> {
     }
 
     if (_stage == _UploadStage.error) {
+      // A permanent fault gets no Retry button — the server has already said
+      // the request can never succeed, so the only honest option is to
+      // discard. The subtitle says why, rather than implying a flaky network.
       return _StatusView(
-        icon: Icon(Icons.error_outline_rounded, color: theme.colorScheme.error, size: 40),
+        headline: l10n.t(AppStrings.recordErrorTitle),
+        icon: Icon(Icons.error_outline_rounded, color: theme.colorScheme.error, size: 34),
         title: l10n.t(AppStrings.recordErrorTitle),
-        subtitle: l10n.t(AppStrings.recordErrorSubtitle),
-        action: Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 12,
-          runSpacing: 12,
+        subtitle: l10n.t(_errorIsPermanent
+            ? AppStrings.recordErrorPermanentSubtitle
+            : AppStrings.recordErrorSubtitle),
+        action: Column(
           children: [
-            OutlinedButton(
-              onPressed: _discardError,
-              child: Text(l10n.t(AppStrings.jobCardDiscard)),
-            ),
-            ElevatedButton(
-              onPressed: _retry,
-              child: Text(l10n.t(AppStrings.retry)),
+            if (!_errorIsPermanent) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _retry,
+                  child: Text(l10n.t(AppStrings.retry)),
+                ),
+              ),
+              const SizedBox(height: AppTheme.space3),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _discardError,
+                child: Text(l10n.t(AppStrings.jobCardDiscard)),
+              ),
             ),
           ],
         ),
@@ -253,25 +300,32 @@ class _RecordViewState extends State<RecordView> {
 
     final isRecording = _controller.isRecording;
 
-    return SafeArea(
+    return BlockScaffold(
+      header: _RecordHeader(isRecording: isRecording),
       child: SingleChildScrollView(
-        padding: AppTheme.screenPadding,
+        padding: const EdgeInsets.fromLTRB(
+          AppTheme.space5,
+          AppTheme.space6,
+          AppTheme.space5,
+          AppTheme.navClearance,
+        ),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _StatusHeader(isRecording: isRecording),
-                const SizedBox(height: 20),
                 _RecordingActionCard(
                   isRecording: isRecording,
-                  amplitude: _controller.amplitude,
-                  elapsedLabel: _formatDuration(_controller.elapsed),
+                  // Passed as listenables so a new level or a timer tick
+                  // repaints only the meter and the readout, instead of
+                  // rebuilding this whole screen several times a second.
+                  amplitude: _controller.amplitudeListenable,
+                  elapsed: _controller.elapsedListenable,
                   onPressed: _handleTap,
-                  disabled: !isRecording && !subscriptionActive,
+                  disabled: !isRecording && subscriptionLocked,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppTheme.space8),
                 _RecentActivitySection(
                   entries: _recentActivity,
                   formatRelativeTime: _formatRelativeTime,
@@ -285,55 +339,50 @@ class _RecordViewState extends State<RecordView> {
   }
 }
 
-class _StatusHeader extends StatelessWidget {
-  const _StatusHeader({required this.isRecording});
+/// The near-black block at the top of the record screen.
+///
+/// Carries the brand, the date, the headline and the live/idle state. Moving
+/// all four up here is what lets the sheet below hold nothing but the control
+/// itself.
+class _RecordHeader extends StatelessWidget {
+  const _RecordHeader({required this.isRecording});
 
   final bool isRecording;
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final color = isRecording ? theme.colorScheme.error : AppColors.success;
-    final label = isRecording
+
+    final statusColor = isRecording ? p.danger : p.success;
+    final statusLabel = isRecording
         ? l10n.t(AppStrings.recordStatusRecording)
         : l10n.t(AppStrings.recordStatusIdle);
-    final dateLabel = DateFormat.yMMMd(l10n.locale.toString()).format(DateTime.now());
+    final dateLabel = DateFormat.yMMMEd(l10n.locale.toString()).format(DateTime.now());
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withValues(alpha: 0.25)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Spacer(),
+        const AppHeaderBar(),
+        const SizedBox(height: AppTheme.space8),
+        Eyebrow(dateLabel, color: p.onBlockMuted),
+        const SizedBox(height: AppTheme.space3),
         Text(
-          dateLabel,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-          ),
+          isRecording
+              ? l10n.t(AppStrings.recordingTitle)
+              : l10n.t(AppStrings.recordIdleTitle),
+          style: theme.textTheme.displaySmall?.copyWith(color: p.onBlock),
+        ),
+        const SizedBox(height: AppTheme.space4),
+        Row(
+          children: [
+            ToneChip(
+              label: statusLabel,
+              dotColor: statusColor,
+              tone: ChipTone.onBlock,
+            ),
+          ],
         ),
       ],
     );
@@ -344,53 +393,71 @@ class _RecordingActionCard extends StatelessWidget {
   const _RecordingActionCard({
     required this.isRecording,
     required this.amplitude,
-    required this.elapsedLabel,
+    required this.elapsed,
     required this.onPressed,
     this.disabled = false,
   });
 
   final bool isRecording;
-  final double amplitude;
-  final String elapsedLabel;
+  final ValueListenable<double> amplitude;
+  final ValueListenable<Duration> elapsed;
   final VoidCallback onPressed;
   final bool disabled;
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final l10n = context.l10n;
     final theme = Theme.of(context);
 
     return SurfaceCard(
-      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
+      radius: AppTheme.radiusXl,
+      padding: const EdgeInsets.symmetric(vertical: AppTheme.space8, horizontal: AppTheme.space6),
       child: Column(
         children: [
-          Text(
-            isRecording
-                ? l10n.t(AppStrings.recordingTitle)
-                : l10n.t(AppStrings.recordIdleTitle),
-            style: theme.textTheme.headlineSmall,
+          // The meter sits in its own sunken well so it reads as an instrument
+          // panel rather than free-floating bars on the card.
+          SurfaceWell(
+            radius: AppTheme.radiusLg,
+            padding: const EdgeInsets.symmetric(
+              vertical: AppTheme.space4,
+              horizontal: AppTheme.space4,
+            ),
+            child: Column(
+              children: [
+                ValueListenableBuilder<double>(
+                  valueListenable: amplitude,
+                  builder: (context, level, _) =>
+                      AudioVisualizer(amplitude: level, isActive: isRecording),
+                ),
+                const SizedBox(height: AppTheme.space3),
+                ValueListenableBuilder<Duration>(
+                  valueListenable: elapsed,
+                  builder: (context, value, _) => Text(
+                    _formatDuration(value),
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      color: isRecording ? p.danger : p.ink,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppTheme.space8),
+          RecordButton(
+            isRecording: isRecording,
+            onPressed: onPressed,
+            disabled: disabled,
+          ),
+          const SizedBox(height: AppTheme.space6),
           Text(
             isRecording
                 ? l10n.t(AppStrings.recordingSubtitle)
                 : l10n.t(AppStrings.recordIdleSubtitle),
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
+            style: theme.textTheme.bodyMedium?.copyWith(color: p.inkSecondary),
           ),
-          const SizedBox(height: 28),
-          AudioVisualizer(amplitude: amplitude, isActive: isRecording),
-          const SizedBox(height: 16),
-          Text(
-            elapsedLabel,
-            style: theme.textTheme.displaySmall?.copyWith(
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-          const SizedBox(height: 28),
-          RecordButton(isRecording: isRecording, onPressed: onPressed),
         ],
       ),
     );
@@ -408,31 +475,47 @@ class _RecentActivitySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final l10n = context.l10n;
     final theme = Theme.of(context);
 
-    return SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(l10n.t(AppStrings.recordRecentActivityTitle), style: theme.textTheme.titleMedium),
-          if (entries.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(
-                l10n.t(AppStrings.recordRecentActivityEmpty),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeading(
+          title: l10n.t(AppStrings.recordRecentActivityTitle),
+          trailing: entries.isEmpty
+              ? null
+              : ToneChip(label: '${entries.length}', tone: ChipTone.neutral),
+        ),
+        const SizedBox(height: AppTheme.space4),
+        if (entries.isEmpty)
+          // An empty state on its own dashed-feeling well, rather than a grey
+          // sentence floating under a heading.
+          SurfaceWell(
+            radius: AppTheme.radiusLg,
+            padding: const EdgeInsets.symmetric(
+              vertical: AppTheme.space8,
+              horizontal: AppTheme.space5,
+            ),
+            child: Column(
+              children: [
+                IconTile(Icons.description_outlined, tone: TileTone.neutral),
+                const SizedBox(height: AppTheme.space4),
+                Text(
+                  l10n.t(AppStrings.recordRecentActivityEmpty),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: p.inkTertiary),
                 ),
-              ),
-            )
-          else
-            for (final entry in entries) ...[
-              const SizedBox(height: 12),
-              _RecentActivityTile(entry: entry, timeLabel: formatRelativeTime(entry.time)),
-            ],
-        ],
-      ),
+              ],
+            ),
+          )
+        else
+          for (final entry in entries) ...[
+            _RecentActivityTile(entry: entry, timeLabel: formatRelativeTime(entry.time)),
+            if (entry != entries.last) const SizedBox(height: AppTheme.space3),
+          ],
+      ],
     );
   }
 }
@@ -445,27 +528,16 @@ class _RecentActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppTheme.radius - 4),
-      ),
+    return SurfaceCard(
+      radius: AppTheme.radiusLg,
+      padding: const EdgeInsets.all(AppTheme.space4),
       child: Row(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Icon(Icons.description_outlined, size: 18, color: theme.colorScheme.primary),
-          ),
-          const SizedBox(width: 12),
+          const IconTile(Icons.description_outlined, size: 42),
+          const SizedBox(width: AppTheme.space3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,7 +546,7 @@ class _RecentActivityTile extends StatelessWidget {
                   entry.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.titleSmall,
                 ),
                 if (entry.subtitle.isNotEmpty) ...[
                   const SizedBox(height: 2),
@@ -482,20 +554,16 @@ class _RecentActivityTile extends StatelessWidget {
                     entry.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
-                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(color: p.inkTertiary),
                   ),
                 ],
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppTheme.space3),
           Text(
             timeLabel,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
+            style: theme.textTheme.bodySmall?.copyWith(color: p.inkTertiary),
           ),
         ],
       ),
@@ -503,14 +571,18 @@ class _RecentActivityTile extends StatelessWidget {
   }
 }
 
+/// Processing and error states, kept on the same block/sheet shape as the idle
+/// screen so the layout never jumps between them.
 class _StatusView extends StatelessWidget {
   const _StatusView({
+    required this.headline,
     required this.icon,
     required this.title,
     required this.subtitle,
     this.action,
   });
 
+  final String headline;
   final Widget icon;
   final String title;
   final String subtitle;
@@ -518,40 +590,74 @@ class _StatusView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final theme = Theme.of(context);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    icon,
-                    const SizedBox(height: 20),
-                    Text(title, style: theme.textTheme.titleLarge),
-                    const SizedBox(height: 8),
-                    Text(
-                      subtitle,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
+
+    return BlockScaffold(
+      header: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AppHeaderBar(),
+          const SizedBox(height: AppTheme.space8),
+          Text(
+            headline,
+            style: theme.textTheme.displaySmall?.copyWith(color: p.onBlock),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppTheme.space6,
+                    AppTheme.space8,
+                    AppTheme.space6,
+                    AppTheme.navClearance,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 76,
+                          height: 76,
+                          decoration: BoxDecoration(
+                            color: p.surfaceMuted,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: icon,
+                        ),
+                        const SizedBox(height: AppTheme.space6),
+                        Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: AppTheme.space3),
+                        Text(
+                          subtitle,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(color: p.inkSecondary),
+                        ),
+                        if (action != null) ...[
+                          const SizedBox(height: AppTheme.space8),
+                          action!,
+                        ],
+                      ],
                     ),
-                    if (action != null) ...[
-                      const SizedBox(height: 24),
-                      action!,
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

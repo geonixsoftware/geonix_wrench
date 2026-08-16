@@ -16,10 +16,17 @@ class AudioUploadException implements Exception {
     this.message, {
     this.isTimeout = false,
     this.isPaymentRequired = false,
+    this.isNoSpeech = false,
+    this.isPermanent = false,
   });
   final String message;
   final bool isTimeout;
   final bool isPaymentRequired;
+  final bool isNoSpeech;
+
+  /// The upload failed for a reason retrying cannot change — a server
+  /// misconfiguration, or a recording this server will never accept.
+  final bool isPermanent;
 
   @override
   String toString() => message;
@@ -87,6 +94,30 @@ class AudioUploadService {
       throw AudioUploadException(
         'This feature requires an active subscription',
         isPaymentRequired: true,
+      );
+    }
+    // 422 is the server's verdict that the recording held no usable speech.
+    // That is something the user can act on (unmuted mic, speak up, record
+    // again) rather than a fault to retry, so it is flagged separately. The
+    // body is not read for the reason above — the status alone says enough.
+    if (response.statusCode == 422) {
+      throw AudioUploadException(
+        'Recording did not contain enough usable speech',
+        isNoSpeech: true,
+      );
+    }
+    // The server already separates faults it may recover from (502 provider
+    // hiccup, 503 busy transcription queue, 429 rate limit) from ones it never
+    // will (500 a misconfigured or rejected AI account, 400 a file type it
+    // won't accept, 413 a recording over the size cap). That distinction is
+    // the whole reason the backend picks between 502 and 500, so it is carried
+    // through here rather than flattened back into one "server error" — a
+    // Retry button on a permanent fault only ever fails again.
+    const permanentStatuses = {400, 413, 500};
+    if (permanentStatuses.contains(response.statusCode)) {
+      throw AudioUploadException(
+        'Server returned ${response.statusCode}',
+        isPermanent: true,
       );
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {

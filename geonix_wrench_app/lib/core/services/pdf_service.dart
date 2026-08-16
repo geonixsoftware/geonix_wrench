@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
@@ -22,10 +23,65 @@ class PdfFetchException implements Exception {
 }
 
 class PdfService {
-  PdfService({required this.authService, this.baseUrl = kApiBaseUrl});
+  PdfService({
+    required this.authService,
+    this.baseUrl = kApiBaseUrl,
+    this.pdfDirectory,
+  });
 
   final AuthService authService;
   final String baseUrl;
+
+  /// Folder chosen in Settings, or null for the platform downloads folder.
+  final String? pdfDirectory;
+
+  /// Resolves where a generated PDF should be written.
+  ///
+  /// [preferred] is the folder chosen in Settings. It is used only if it still
+  /// exists and is still writable — a path can go stale (external drive
+  /// unplugged, folder deleted, macOS sandbox access not renewed after a
+  /// relaunch), and silently failing to save a job card the mechanic believes
+  /// is on disk is worse than quietly falling back.
+  ///
+  /// Falls back to the platform downloads folder, then to app documents on
+  /// mobile, where there is no downloads folder and the share sheet is the
+  /// real delivery mechanism anyway.
+  static Future<Directory> resolveTargetDirectory(String? preferred) async {
+    if (preferred != null && preferred.isNotEmpty) {
+      final chosen = Directory(preferred);
+      if (await _isWritable(chosen)) return chosen;
+      AppLogger.warn(
+        'PdfService: configured PDF folder is not writable, falling back',
+      );
+    }
+
+    if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
+      try {
+        final downloads = await getDownloadsDirectory();
+        if (downloads != null && await _isWritable(downloads)) return downloads;
+      } catch (e, stackTrace) {
+        AppLogger.warn('PdfService: downloads folder unavailable', e, stackTrace);
+      }
+    }
+    return getApplicationDocumentsDirectory();
+  }
+
+  static Future<bool> _isWritable(Directory directory) async {
+    try {
+      if (!await directory.exists()) return false;
+      // Existence is not permission — on a sandboxed macOS build the folder
+      // resolves fine and the write is what fails. Prove it with a probe.
+      final probe = File(
+        '${directory.path}/.geonix_write_probe_'
+        '${DateTime.now().microsecondsSinceEpoch}',
+      );
+      await probe.writeAsBytes(const [0]);
+      await probe.delete();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<File> generate(JobCard card, AppCurrency currency) async {
     final uri = Uri.parse('$baseUrl/api/jobcards/${card.id}/pdf');
@@ -53,22 +109,39 @@ class PdfService {
 
     final bytes = response.bodyBytes;
 
-    // Encrypt the PDF at rest BEFORE it touches disk — no cleartext copy on the
-    // device. The in-memory bytes are still used for instant sharing below.
-    final protectedBytes = await FileCipher.encryptBytes(bytes);
-
-    final directory = await getApplicationDocumentsDirectory();
-    final fileName = 'job_card_${card.id}_${DateTime.now().millisecondsSinceEpoch}.pdf.enc';
+    // A job card exists to be handed to a customer, printed, or emailed, so it
+    // is written as a readable PDF the mechanic can actually open — in
+    // Downloads by default, or the folder chosen in Settings.
+    //
+    // This is a deliberate reversal of the previous behaviour, which encrypted
+    // the file at rest into the app container as `.pdf.enc`. That kept no
+    // cleartext copy on the device, but it also meant the document was
+    // unreachable outside the app. The encrypted copy below preserves the
+    // at-rest protection for the app's own retained history; the exported copy
+    // is the deliverable, and it is cleartext by necessity.
+    final directory = await resolveTargetDirectory(pdfDirectory);
+    final fileName = 'job_card_${card.id}_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File('${directory.path}/$fileName');
-    await file.writeAsBytes(protectedBytes);
+    await file.writeAsBytes(bytes);
 
-    AppLogger.api('PdfService: saved encrypted $fileName '
-        '(${protectedBytes.length} bytes)');
+    AppLogger.api('PdfService: wrote $fileName (${bytes.length} bytes)');
+
+    // Retained encrypted copy in the app container, unchanged in spirit from
+    // the original design: the app's own record stays protected at rest.
+    try {
+      final protectedBytes = await FileCipher.encryptBytes(bytes);
+      final documents = await getApplicationDocumentsDirectory();
+      await File('${documents.path}/$fileName.enc').writeAsBytes(protectedBytes);
+    } catch (e, stackTrace) {
+      // The exported PDF is what the user asked for and it is already on disk;
+      // losing the archived copy must not fail the save.
+      AppLogger.warn('PdfService: could not write encrypted archive copy', e, stackTrace);
+    }
 
     try {
       await Printing.sharePdf(bytes: bytes, filename: 'job_card_${card.id}.pdf');
     } catch (_) {
-      // Sharing is unavailable on this platform; the encrypted file is saved.
+      // Sharing is unavailable on this platform; the saved file is the result.
     }
 
     return file;

@@ -31,8 +31,17 @@ class BillingService {
     return 'Server returned ${response.statusCode}';
   }
 
-  Future<BillingStatus> fetchStatus() async {
-    final uri = Uri.parse('$baseUrl/api/billing/status');
+  /// Reads the subscription status.
+  ///
+  /// Set [reconcile] when the answer must be authoritative rather than merely
+  /// current — returning from checkout, above all. It asks the server to verify
+  /// against Stripe if it has nothing active on file, which covers a webhook
+  /// that was never delivered. It costs a Stripe round-trip, so the routine
+  /// refresh path leaves it off.
+  Future<BillingStatus> fetchStatus({bool reconcile = false}) async {
+    final uri = Uri.parse(
+      '$baseUrl/api/billing/status${reconcile ? '?reconcile=true' : ''}',
+    );
     http.Response response;
     try {
       response = await http.get(uri, headers: await authHeader(authService));
@@ -60,7 +69,7 @@ class BillingService {
         headers: {'Content-Type': 'application/json', ...await authHeader(authService)},
         body: jsonEncode({
           'plan': plan,
-          if (quantity != null) 'quantity': quantity,
+          'quantity': ?quantity,
           'success_url': successUrl,
           'cancel_url': cancelUrl,
         }),
@@ -74,5 +83,48 @@ class BillingService {
     }
     final decoded = (jsonDecode(response.body) as Map).cast<String, dynamic>();
     return decoded['checkout_url'].toString();
+  }
+
+  /// Opens the Stripe Billing Portal, where a customer can cancel, change
+  /// their card or download invoices. None of that existed in-app before.
+  Future<String> createPortalSession({required String returnUrl}) async {
+    final uri = Uri.parse('$baseUrl/api/billing/portal-session');
+    http.Response response;
+    try {
+      response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json', ...await authHeader(authService)},
+        body: jsonEncode({'return_url': returnUrl}),
+      );
+    } catch (e) {
+      throw BillingException('Could not reach the processing server');
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw BillingException(_detailFrom(response));
+    }
+    final decoded = (jsonDecode(response.body) as Map).cast<String, dynamic>();
+    return decoded['portal_url'].toString();
+  }
+
+  /// Changes the seat count on an existing Team subscription. Returns the
+  /// refreshed status so the caller does not need a second round trip.
+  Future<BillingStatus> updateSeats(int quantity) async {
+    final uri = Uri.parse('$baseUrl/api/billing/seats');
+    http.Response response;
+    try {
+      response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json', ...await authHeader(authService)},
+        body: jsonEncode({'quantity': quantity}),
+      );
+    } catch (e) {
+      throw BillingException('Could not reach the processing server');
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw BillingException(_detailFrom(response));
+    }
+    return BillingStatus.fromJson((jsonDecode(response.body) as Map).cast<String, dynamic>());
   }
 }

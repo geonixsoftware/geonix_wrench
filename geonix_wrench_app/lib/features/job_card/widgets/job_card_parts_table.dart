@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/l10n/app_localizations.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/models/job_card.dart';
+import '../../../core/theme/app_theme.dart';
 
 class PartEditControllers {
   PartEditControllers(PartUsed part)
@@ -35,6 +36,7 @@ class JobCardPartsEditTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final theme = Theme.of(context);
     final l10n = context.l10n;
 
@@ -42,16 +44,39 @@ class JobCardPartsEditTable extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (var i = 0; i < partsUsed.length; i++) ...[
-          if (i > 0) ...[
-            const SizedBox(height: 16),
-            Divider(color: theme.dividerColor, height: 1),
-            const SizedBox(height: 16),
-          ],
-          Text(
-            partsUsed[i].partName,
-            style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+          // Numbered rows rather than divider-separated blocks: with two text
+          // fields per part, a 1px rule was not enough to tell where one part
+          // ended and the next began.
+          if (i > 0) const SizedBox(height: AppTheme.space5),
+          Row(
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: p.secondarySoft,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Text(
+                  '${i + 1}',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: p.secondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppTheme.space3),
+              Expanded(
+                child: Text(
+                  partsUsed[i].partName,
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppTheme.space3),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -63,7 +88,7 @@ class JobCardPartsEditTable extends StatelessWidget {
                   decoration: InputDecoration(labelText: l10n.t(AppStrings.jobCardQuantity)),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppTheme.space3),
               Expanded(
                 flex: 2,
                 child: TextField(

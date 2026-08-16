@@ -7,7 +7,8 @@ import '../../core/l10n/app_localizations.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/services/user_profile_service.dart';
 import '../../core/user/user_profile_controller.dart';
-import '../../shared/widgets/surface_card.dart';
+import 'login_screen.dart';
+import '../../core/theme/app_theme.dart';
 
 final RegExp _handleRegex = RegExp(r'^[a-z0-9_]+$');
 
@@ -73,67 +74,53 @@ class _HandleSetupScreenState extends State<HandleSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final l10n = context.l10n;
     final theme = Theme.of(context);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: SurfaceCard(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(l10n.t(AppStrings.handleSetupTitle), style: theme.textTheme.titleLarge),
-                      const SizedBox(height: 12),
-                      Text(
-                        l10n.t(AppStrings.handleSetupDescription),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: _handleController,
-                        autocorrect: false,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
-                          TextInputFormatter.withFunction(
-                            (oldValue, newValue) => newValue.copyWith(text: newValue.text.toLowerCase()),
-                          ),
-                        ],
-                        decoration: InputDecoration(
-                          labelText: l10n.t(AppStrings.handleSetupLabel),
-                          hintText: l10n.t(AppStrings.handleSetupHint),
-                        ),
-                        validator: _validate,
-                      ),
-                      if (_serverError != null) ...[
-                        const SizedBox(height: 8),
-                        Text(_serverError!, style: TextStyle(color: theme.colorScheme.error)),
-                      ],
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: _busy ? null : _submit,
-                        child: _busy
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : Text(l10n.t(AppStrings.handleSetupSubmit)),
-                      ),
-                    ],
-                  ),
+    return AuthBlockScaffold(
+      title: l10n.t(AppStrings.handleSetupTitle),
+      subtitle: l10n.t(AppStrings.handleSetupDescription),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: _handleController,
+              autocorrect: false,
+              inputFormatters: [
+                FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                TextInputFormatter.withFunction(
+                  (oldValue, newValue) => newValue.copyWith(text: newValue.text.toLowerCase()),
                 ),
+              ],
+              decoration: InputDecoration(
+                labelText: l10n.t(AppStrings.handleSetupLabel),
+                hintText: l10n.t(AppStrings.handleSetupHint),
+                prefixIcon: const Icon(Icons.alternate_email_rounded),
               ),
+              validator: _validate,
             ),
-          ),
+            if (_serverError != null) ...[
+              const SizedBox(height: AppTheme.space3),
+              Text(
+                _serverError!,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+              ),
+            ],
+            const SizedBox(height: AppTheme.space6),
+            ElevatedButton(
+              onPressed: _busy ? null : _submit,
+              child: _busy
+                  ? SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: p.onAccent),
+                    )
+                  : Text(l10n.t(AppStrings.handleSetupSubmit)),
+            ),
+          ],
         ),
       ),
     );
