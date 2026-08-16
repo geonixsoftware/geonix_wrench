@@ -11,6 +11,7 @@ import '../auth/handle_setup_screen.dart';
 import '../auth/login_screen.dart';
 import '../auth/org_onboarding_screen.dart';
 import 'root_shell.dart';
+import '../../core/theme/app_theme.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -55,7 +56,10 @@ class _AuthGateState extends State<AuthGate> {
       return const LoginScreen();
     }
 
-    if (profileController.isLoading) {
+    // Only block on the *first* load. Later refreshes keep the current screen
+    // on-screen and update in place, so routine actions no longer flash the
+    // whole app back to a spinner.
+    if (profileController.isInitialLoad) {
       return const _LoadingScreen();
     }
 
@@ -81,14 +85,23 @@ class _LoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+
+    // Matches the splash exactly, so the handover between the two is
+    // invisible instead of a flash from black to white and back.
     return Scaffold(
+      backgroundColor: p.block,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            GeonixLogo(height: 40),
-            SizedBox(height: 24),
-            CircularProgressIndicator(strokeWidth: 2),
+          children: [
+            const GeonixLogo(height: 44, onDark: true),
+            const SizedBox(height: AppTheme.space8),
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2, color: p.accent),
+            ),
           ],
         ),
       ),
@@ -103,16 +116,52 @@ class _RetryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final l10n = context.l10n;
+    final theme = Theme.of(context);
+
     return Scaffold(
+      backgroundColor: p.canvas,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(l10n.t(AppStrings.authGenericError)),
-            const SizedBox(height: 16),
-            ElevatedButton(onPressed: onRetry, child: Text(l10n.t(AppStrings.retry))),
-          ],
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: Padding(
+            padding: const EdgeInsets.all(AppTheme.space8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(color: p.surfaceMuted, shape: BoxShape.circle),
+                  alignment: Alignment.center,
+                  child: Icon(Icons.cloud_off_rounded, size: 32, color: p.inkTertiary),
+                ),
+                const SizedBox(height: AppTheme.space6),
+                Text(
+                  l10n.t(AppStrings.authOfflineTitle),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineSmall,
+                ),
+                const SizedBox(height: AppTheme.space3),
+                Text(
+                  // The old copy was a bare "Something went wrong", which gave
+                  // no hint that the backend simply wasn't reachable.
+                  l10n.t(AppStrings.authOfflineMessage),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: p.inkSecondary),
+                ),
+                const SizedBox(height: AppTheme.space8),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: onRetry,
+                    child: Text(l10n.t(AppStrings.retry)),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -24,30 +24,8 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.799835917197-f8r4lha02o49ep8pfdef7jlgam4mgc8a</string>
-			</array>
-		</dict>
-	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.799835917197-f8r4lha02o49ep8pfdef7jlgam4mgc8a</string>
-			</array>
-		</dict>
-	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Geonix Wrench needs microphone access to record job audio for processing.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

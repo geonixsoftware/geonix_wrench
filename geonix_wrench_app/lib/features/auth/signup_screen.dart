@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -9,8 +6,9 @@ import '../../core/auth/auth_exceptions.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/l10n/app_localizations.dart';
 import '../../core/l10n/app_strings.dart';
-import '../../shared/widgets/geonix_logo.dart';
-import '../../shared/widgets/surface_card.dart';
+import 'login_screen.dart';
+import 'widgets/password_field.dart';
+import '../../core/theme/app_theme.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -54,40 +52,10 @@ class _SignupScreenState extends State<SignupScreen> {
       Navigator.of(context).popUntil((route) => route.isFirst);
     } on FirebaseAuthException catch (e) {
       _showError(mapFirebaseAuthException(e).message);
-    } catch (_) {
-      _showError(l10n.t(AppStrings.authGenericError));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _continueWithGoogle() async {
-    final l10n = context.l10n;
-    setState(() => _busy = true);
-    try {
-      await context.read<AuthService>().signInWithGoogle();
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } on FirebaseAuthException catch (e) {
-      _showError(mapFirebaseAuthException(e).message);
-    } catch (_) {
-      _showError(l10n.t(AppStrings.authGenericError));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _continueWithApple() async {
-    final l10n = context.l10n;
-    setState(() => _busy = true);
-    try {
-      await context.read<AuthService>().signInWithApple();
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } on FirebaseAuthException catch (e) {
-      _showError(mapFirebaseAuthException(e).message);
-    } catch (_) {
-      _showError(l10n.t(AppStrings.authGenericError));
+    } catch (e, stackTrace) {
+      debugPrint('SignupScreen._submit failed: $e\n$stackTrace');
+      _showError(describeUnexpectedAuthError(e, l10n.t(AppStrings.authGenericError)));
+      rethrow;
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -95,103 +63,84 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final l10n = context.l10n;
-    final showApple = !kIsWeb && (Platform.isIOS || Platform.isMacOS);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Center(child: GeonixLogo(height: 40)),
-                  const SizedBox(height: 24),
-                  SurfaceCard(
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(l10n.t(AppStrings.authSignUpTitle), style: Theme.of(context).textTheme.titleLarge),
-                          const SizedBox(height: 20),
-                          TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: InputDecoration(labelText: l10n.t(AppStrings.authEmailLabel)),
-                            validator: (value) =>
-                                (value == null || value.trim().isEmpty) ? l10n.t(AppStrings.authEmailRequired) : null,
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: true,
-                            decoration: InputDecoration(labelText: l10n.t(AppStrings.authPasswordLabel)),
-                            validator: (value) =>
-                                (value == null || value.isEmpty) ? l10n.t(AppStrings.authPasswordRequired) : null,
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _confirmPasswordController,
-                            obscureText: true,
-                            decoration: InputDecoration(labelText: l10n.t(AppStrings.authConfirmPasswordLabel)),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return l10n.t(AppStrings.authPasswordRequired);
-                              }
-                              if (value != _passwordController.text) {
-                                return l10n.t(AppStrings.authPasswordsDoNotMatch);
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          ElevatedButton(
-                            onPressed: _busy ? null : _submit,
-                            child: _busy
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                  )
-                                : Text(l10n.t(AppStrings.authSignUpButton)),
-                          ),
-                          const SizedBox(height: 16),
-                          OutlinedButton.icon(
-                            onPressed: _busy ? null : _continueWithGoogle,
-                            icon: const Icon(Icons.g_mobiledata_rounded),
-                            label: Text(l10n.t(AppStrings.authContinueWithGoogle)),
-                          ),
-                          if (showApple) ...[
-                            const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              onPressed: _busy ? null : _continueWithApple,
-                              icon: const Icon(Icons.apple),
-                              label: Text(l10n.t(AppStrings.authContinueWithApple)),
-                            ),
-                          ],
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(l10n.t(AppStrings.authHaveAccountPrompt)),
-                              TextButton(
-                                onPressed: _busy ? null : () => Navigator.of(context).pop(),
-                                child: Text(l10n.t(AppStrings.authSignInLink)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+    return AuthBlockScaffold(
+      showBack: true,
+      title: l10n.t(AppStrings.authSignUpTitle),
+      subtitle: l10n.t(AppStrings.authSignUpSubtitle),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.email],
+              decoration: InputDecoration(
+                labelText: l10n.t(AppStrings.authEmailLabel),
+                prefixIcon: const Icon(Icons.mail_outline),
               ),
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? l10n.t(AppStrings.authEmailRequired)
+                  : null,
             ),
-          ),
+            const SizedBox(height: AppTheme.space3),
+            PasswordField(
+              controller: _passwordController,
+              label: l10n.t(AppStrings.authPasswordLabel),
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.newPassword],
+              validator: (value) => (value == null || value.isEmpty)
+                  ? l10n.t(AppStrings.authPasswordRequired)
+                  : null,
+            ),
+            const SizedBox(height: AppTheme.space3),
+            PasswordField(
+              controller: _confirmPasswordController,
+              label: l10n.t(AppStrings.authConfirmPasswordLabel),
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.newPassword],
+              onFieldSubmitted: (_) => _busy ? null : _submit(),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return l10n.t(AppStrings.authPasswordRequired);
+                }
+                if (value != _passwordController.text) {
+                  return l10n.t(AppStrings.authPasswordsDoNotMatch);
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: AppTheme.space6),
+            FilledButton(
+              onPressed: _busy ? null : _submit,
+              child: _busy
+                  ? SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: p.onAccent),
+                    )
+                  : Text(l10n.t(AppStrings.authSignUpButton)),
+            ),
+            const SizedBox(height: AppTheme.space4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  l10n.t(AppStrings.authHaveAccountPrompt),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                TextButton(
+                  onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                  child: Text(l10n.t(AppStrings.authSignInLink)),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

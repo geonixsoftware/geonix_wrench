@@ -87,11 +87,45 @@ class BillingStatusResponse(BaseModel):
     current_period_end: Optional[str] = None
     seat_limit: Optional[int] = None
     seat_used: Optional[int] = None
+    plan: Optional[str] = None
+    min_seats: Optional[int] = None
+    # The Team seat floor, quoted in every scope so the plan picker's stepper
+    # is correct even for a caller who is not on the Team plan.
+    team_min_seats: Optional[int] = None
+    # Advertised price for the plan that matches this scope. Kept for existing
+    # clients; new clients read the two plan-specific fields below instead.
+    price_per_seat: Optional[float] = None
+    # Both advertised prices, independent of the caller's current scope. The
+    # plan picker shows Individual and Team side by side, so quoting only the
+    # scope's own price made the *other* card advertise the wrong figure.
+    individual_price: Optional[float] = None
+    team_price_per_seat: Optional[float] = None
+    currency: Optional[str] = None
+    can_manage_seats: bool = False
+    # True when an active Team subscription is still waiting for its shop to be
+    # named. The app prompts for a name only — the seat count is already paid.
+    needs_shop: bool = False
+
+
+class PortalSessionRequest(BaseModel):
+    return_url: str
+
+
+class PortalSessionResponse(BaseModel):
+    portal_url: str
+
+
+class SeatUpdateRequest(BaseModel):
+    quantity: int = Field(ge=1)
 
 
 class OrganizationCreateRequest(BaseModel):
     name: str
-    seat_limit: int
+    # No seat_limit: the shop gets exactly the seats its owner paid for, read
+    # from the Team subscription server-side. Accepting one from the client let
+    # a shop be created with more seats than were purchased. Older clients may
+    # still send the field; it is ignored rather than rejected.
+    model_config = {"extra": "ignore"}
 
 
 class MemberResponse(BaseModel):

@@ -1,12 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AuthService extends ChangeNotifier {
-  AuthService({FirebaseAuth? firebaseAuth, GoogleSignIn? googleSignIn})
-      : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
-        _googleSignIn = googleSignIn ?? GoogleSignIn() {
+  AuthService({FirebaseAuth? firebaseAuth})
+      : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance {
     _firebaseAuth.authStateChanges().listen((user) {
       _loaded = true;
       notifyListeners();
@@ -14,12 +11,16 @@ class AuthService extends ChangeNotifier {
   }
 
   final FirebaseAuth _firebaseAuth;
-  final GoogleSignIn _googleSignIn;
   bool _loaded = false;
 
   User? get firebaseUser => _firebaseAuth.currentUser;
   bool get isSignedIn => firebaseUser != null;
   bool get isLoaded => _loaded;
+
+  /// Stable identity for the signed-in user. Listeners use this to tell an
+  /// actual account change apart from the many no-op notifications Firebase
+  /// and the profile controller emit.
+  String? get currentUserId => firebaseUser?.uid;
 
   Future<void> signUpWithEmail(String email, String password) async {
     await _firebaseAuth.createUserWithEmailAndPassword(email: email, password: password);
@@ -29,38 +30,7 @@ class AuthService extends ChangeNotifier {
     await _firebaseAuth.signInWithEmailAndPassword(email: email, password: password);
   }
 
-  Future<void> signInWithGoogle() async {
-    final account = await _googleSignIn.signIn();
-    if (account == null) {
-      throw FirebaseAuthException(code: 'canceled', message: 'Sign-in was cancelled');
-    }
-    final authentication = await account.authentication;
-    final credential = GoogleAuthProvider.credential(
-      accessToken: authentication.accessToken,
-      idToken: authentication.idToken,
-    );
-    await _firebaseAuth.signInWithCredential(credential);
-  }
-
-  Future<void> signInWithApple() async {
-    final appleCredential = await SignInWithApple.getAppleIDCredential(
-      scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
-    );
-    if (appleCredential.identityToken == null) {
-      throw FirebaseAuthException(
-        code: 'apple-sign-in-failed',
-        message: 'Could not complete Sign in with Apple — no identity token was returned',
-      );
-    }
-    final credential = OAuthProvider('apple.com').credential(
-      idToken: appleCredential.identityToken,
-      accessToken: appleCredential.authorizationCode,
-    );
-    await _firebaseAuth.signInWithCredential(credential);
-  }
-
   Future<void> signOut() async {
-    await _googleSignIn.signOut();
     await _firebaseAuth.signOut();
   }
 

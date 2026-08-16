@@ -1,78 +1,269 @@
-Geonix Wrench Security Audit - 2026-08-13
+Geonix Wrench Security Audit - 2026-08-15
+Replaces the 2026-08-13 audit.
 
-Summary of findings (high-level):
-- Critical secret exposure: backend .env committed with live API keys and webhook secret.
-- Overly permissive CORS in FastAPI (allow_origins=['*']).
-- Some endpoints lack robust upload size checks (audio uploads).
-- LLM prompt & PDF inputs use raw user/model text without length/sanitization limits.
-- No .gitignore present at repo root/backend; venv/ is committed.
+STATUS: findings 1-7 were FIXED on 2026-08-15 after this audit was written.
+Each is annotated below. Findings 8 and 9 need decisions or credentials that
+only the owner has, and remain open.
 
-Detailed findings & evidence:
-1) Environment variables & API keys
-- Evidence: geonix_wrench_backend/.env contains ANTHROPIC_API_KEY, STRIPE_API_KEY (live), STRIPE_WEBHOOK_SECRET, etc.
-  - file: geonix_wrench_backend/.env (lines show keys)
-- Evidence: config.py loads dotenv (load_dotenv()) and reads ANTHROPIC_API_KEY, STRIPE_API_KEY, STRIPE_WEBHOOK_SECRET via os.getenv.
-  - file: geonix_wrench_backend/config.py
-- Risk: Secret exfiltration from source repo and any clones. Live Stripe key and webhook secret are extremely sensitive and should be rotated immediately.
+================================================================================
+RESOLVED SINCE THE 2026-08-13 AUDIT
+================================================================================
 
-Remediation (env & keys):
-- Immediately remove geonix_wrench_backend/.env from version control (git rm --cached) and rotate all exposed secrets (Anthropic key, Stripe API key, Stripe webhook secret, any other secrets).
-- Add at least: /.env, /geonix_wrench_backend/.env, /geonix_wrench_backend/venv/, firebase-service-account.json, and other credentials to .gitignore at repo root and backend.
-- Use environment variables or a secrets manager (HashiCorp Vault, cloud secret manager, GitHub Actions secrets) for production.
-- Purge keys from commit history (git filter-repo or BFG) if repository was shared publicly.
+- Secret exposure via committed .env: FIXED.
+  geonix_wrench_backend/.env is no longer tracked and is matched by .gitignore
+  ("*.env", line 2). Verified: `git ls-files` returns no .env, and a scan for
+  sk_live_ / sk_test_ / whsec_ / sk-ant-api across all tracked files AND all
+  commits in history returns nothing.
 
-2) FastAPI endpoints & CORS
-- Evidence: main.py sets CORSMiddleware with allow_origins=["*"] and allow_methods/headers=["*"] (geonix_wrench_backend/main.py lines 71-77).
-  - file: geonix_wrench_backend/main.py
-- Evidence: Stripe webhook handling uses stripe.Webhook.construct_event with STRIPE_WEBHOOK_SECRET in billing.py (good), and main webhook route uses raw body and signature header (good).
-  - file: geonix_wrench_backend/billing.py and geonix_wrench_backend/main.py
-- Risk: Wildcard CORS allows any origin to perform requests (esp. if allow_credentials=True). This increases attack surface and token theft risk in browsers.
+- No .gitignore at repo root: FIXED. Root .gitignore now covers .env, *.env,
+  venv/, __pycache__/, *.pyc, .DS_Store and firebase-service-account.json.
 
-Remediation (CORS & webhook):
-- Replace allow_origins=["*"] with a production list from env (e.g., ALLOWED_ORIGINS env variable) and explicitly list trusted production domains. Keep wildcard only for local dev.
-- Keep allow_credentials=False or restrict to required origins; avoid combining allow_credentials=True with allow_origins=["*"] in production.
-- Confirm Stripe webhook code uses stripe.Webhook.construct_event (it does). Ensure STRIPE_WEBHOOK_SECRET is rotated and only present in environment/secret manager.
+- Committed venv/: FIXED. `git ls-files | grep venv/` returns 0 files.
 
-3) Authentication & input validation
-- Evidence: Most user routes depend on get_current_user (Firebase token via HTTPBearer) — auth.py verifies Firebase tokens (good).
-  - file: geonix_wrench_backend/auth.py
-- Evidence: process-audio endpoint validates file extension but does NOT enforce a max audio upload size before reading file into temp (main.py lines ~136-174). Logo upload has size limit (MAX_LOGO_SIZE_BYTES) and extension check (good).
-  - file: geonix_wrench_backend/main.py and config.py
-- Evidence: PDF generator puts jobcard fields directly into Paragraph() (reportlab) and uses parts/jobcard fields without explicit length limits; LLM extraction uses raw transcript in prompts.
-  - files: geonix_wrench_backend/pdf_generator.py, geonix_wrench_backend/extraction.py
-- Risks: Large or maliciously crafted uploads may cause resource exhaustion; unsanitized/long inputs may break PDF generation or LLM prompting (prompt injection or malformed outputs). Regex-based JSON extraction from LLM output is brittle and can be manipulated.
+- firebase-service-account.json: correctly ignored and untracked; only the
+  .example placeholder is committed.
 
-Remediation (auth & validation):
-- Enforce server-side maximum upload sizes for audio (e.g., MAX_AUDIO_BYTES env var). Validate content-length header where possible, use ASGI/gunicorn/body size limits, and reject before buffering entire file.
-- Validate MIME type in addition to extension and limit accepted encodings. Stream uploads to disk with enforced quotas.
-- For PDF inputs (vehicle_info, work_performed, parts_used): enforce maximum string lengths, maximum number of parts, and sanitize control/unicode characters. Escape or truncate before passing to reportlab Paragraph.
-- For LLM inputs: enforce transcript length caps, strip or neutralize embedded instruction-like patterns if feasible, and always validate model outputs strictly against the JSON schema (currently done via pydantic — keep this). Improve _extract_json_block parsing to be robust; log and reject non-conforming outputs.
+CAVEAT: the keys that were exposed before are still exposed. Removing a file
+from git does not un-leak a credential that was already on screen or on disk.
+See finding 8.
 
-4) Other repository hygiene
-- Evidence: geonix_wrench_backend/venv exists and site-packages are present. No .gitignore files found at repo root or backend to exclude venv and credentials.
-- Risk: Committed venv increases leak surface and repository size; committed secrets in .env are present.
+================================================================================
+OPEN FINDINGS
+================================================================================
 
-Remediation (repo hygiene):
-- Remove venv directory from repo history and add venv/ to .gitignore. Use virtualenv locally; do not commit site-packages.
-- Add a clear .gitignore at repo root listing common entries: .env, *.env, venv/, __pycache__/, .pytest_cache/, *.pyc, firebase-service-account.json, .DS_Store, and build artifacts.
-- Rotate keys and run a secret-scan across commit history.
+--------------------------------------------------------------------------------
+1. HIGH - Wildcard CORS combined with credentials
+FIXED 2026-08-15: main.py now reads ALLOWED_ORIGINS (comma-separated) from
+the environment and, when set, allows only those origins with credentials and
+an explicit method/header list. With it unset the API falls back to any origin
+WITHOUT credentials and logs a startup warning, so local development still
+works but the credentialed wildcard is gone.
+ACTION STILL NEEDED: set ALLOWED_ORIGINS in the deployed environment.
 
-Action checklist (prioritized):
-1. Revoke/rotate Anthropic key, Stripe API key, Stripe webhook secret immediately.
-2. Remove geonix_wrench_backend/.env from repository (git rm --cached) and add to .gitignore.
-3. Remove committed venv/ from repo and add to .gitignore; consider cleaning history if repo was published.
-4. Restrict CORS to trusted origins via env variable and set allow_credentials appropriately.
-5. Add MAX_AUDIO_SIZE_BYTES and enforce pre-read checks; implement streaming/size-enforced upload handling.
-6. Add input length caps and sanitization for jobcard fields before PDF generation. Harden LLM output parsing and validate strictly.
-7. Move all secrets to a secret manager and CI environment variables; avoid any plaintext keys in source.
-8. Run a full repo secret-scan and, if public exposure occurred, notify stakeholders and follow key revocation steps.
+--------------------------------------------------------------------------------
+Original finding:
+--------------------------------------------------------------------------------
+Evidence: geonix_wrench_backend/main.py:73-78
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 
-Notes (good practices observed):
-- Firebase token verification (auth.get_current_user) is in place for user routes.
-- Stripe webhook verification via construct_event is implemented in billing.handle_webhook_event.
-- reportlab usage is contained to a single module (easier to harden).
-- Pydantic schema validation is used to validate LLM-extracted JSON (keeps some safety guard).
+Risk: with allow_credentials=True, Starlette does not send a literal "*";
+it echoes the requesting Origin back and sets
+Access-Control-Allow-Credentials: true. The practical effect is that ANY
+website can make cross-origin requests to this API and read the responses.
+Authentication is Bearer-token based rather than cookie based, which limits
+classic CSRF, but any page that obtains a token can drive the whole API from
+a browser, and every endpoint's response body is readable cross-origin.
 
-If desired, next steps can include an automated secrets scan commit hook, CI secret gating, and code changes to implement the upload limits and CORS env-based config. I performed only READ-ONLY checks and cited exact files/lines where relevant.
+Remediation: drive allow_origins from an ALLOWED_ORIGINS env var listing the
+real app/site origins. Keep the wildcard for local development only, and do
+not pair it with allow_credentials=True.
+
+--------------------------------------------------------------------------------
+2. HIGH - Live SQLite database committed, containing real user data
+PARTLY FIXED 2026-08-15: geonix_wrench.db is untracked (git rm --cached) and
+*.db / *.sqlite3 are in .gitignore. The file itself is untouched on disk.
+ACTION STILL NEEDED: the blob remains in the two existing commits. Purge it
+with git filter-repo or BFG before the repo is shared. I did not rewrite
+history unprompted - it is destructive and this repo has no remote to recover
+from.
+
+--------------------------------------------------------------------------------
+Original finding:
+--------------------------------------------------------------------------------
+Evidence: geonix_wrench_backend/geonix_wrench.db is tracked
+(`git ls-files` lists it). Reading the committed blob at HEAD:
+    users            1 row
+      columns: id, firebase_uid, email, handle, display_name, org_id,
+               org_role, created_at
+      contains a real firebase_uid, a real email address and the handle
+               "daniel_admin"
+    jobcards 0, organizations 0, invites 0, subscriptions 0
+
+Risk: personal data and a Firebase UID are in version control, and will be
+in every clone and every future copy of the history. If this repository is
+ever published the data is public permanently. A Firebase UID is also the
+subject identifier used for auth, so it is not merely cosmetic.
+
+Remediation: `git rm --cached geonix_wrench_backend/geonix_wrench.db`, add
+*.db / geonix_wrench.db to .gitignore, and purge it from history
+(git filter-repo or BFG) before the repo is shared. Ship an empty schema and
+create the database at first run instead.
+
+--------------------------------------------------------------------------------
+3. MEDIUM - Unbounded audio upload read fully into memory
+FIXED 2026-08-15: limits.read_upload_capped() streams the body to disk in
+1 MB chunks under MAX_AUDIO_SIZE_BYTES (default 25 MB), rejects an oversized
+Content-Length before reading anything, and still enforces the cap while
+streaming because that header is client-supplied. Covered by tests in
+tests/test_limits.py.
+
+--------------------------------------------------------------------------------
+Original finding:
+--------------------------------------------------------------------------------
+Evidence: geonix_wrench_backend/main.py:145-147
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+        tmp.write(await file.read())
+
+Only the file extension is checked (main.py:141-143). There is no
+MAX_AUDIO_SIZE, no Content-Length check, and no streaming: the entire body is
+buffered in memory before anything else happens.
+
+Risk: a single authenticated caller can exhaust server memory with one large
+request. Transcription then runs Whisper over whatever arrives, multiplying
+the cost. This is the cheapest denial-of-service path in the codebase.
+
+Remediation: add MAX_AUDIO_SIZE_BYTES to config, reject on Content-Length
+before reading, stream to disk in chunks with a running byte cap, and abort
+once the cap is passed. Enforce a body-size limit at the ASGI server too.
+
+--------------------------------------------------------------------------------
+4. MEDIUM - Logo upload is size-checked only after buffering
+FIXED 2026-08-15: the logo path uses the same capped reader, so an oversized
+upload is refused without being buffered whole.
+
+--------------------------------------------------------------------------------
+Original finding:
+--------------------------------------------------------------------------------
+Evidence: geonix_wrench_backend/main.py:221-223
+    data = await file.read()
+    if len(data) > MAX_LOGO_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="Logo file is too large")
+
+The limit exists (5 MB) but is applied after the whole body is already in
+memory, so an oversized upload still costs full memory before rejection.
+
+Remediation: check Content-Length first and read in bounded chunks.
+
+--------------------------------------------------------------------------------
+5. MEDIUM - No rate limiting anywhere
+FIXED 2026-08-15: limits.enforce_rate_limit() applies a per-user fixed
+window. /api/process-audio gets its own tighter budget
+(RATE_LIMIT_AUDIO_PER_WINDOW, default 10/min) because it runs Whisper and
+calls a paid model. Counters are per-process: if this is ever run with more
+than one worker, move them to Redis or each worker grants the full budget.
+
+--------------------------------------------------------------------------------
+Original finding:
+--------------------------------------------------------------------------------
+Evidence: no slowapi/limiter/rate-limit usage anywhere in
+geonix_wrench_backend/*.py.
+
+Risk: /api/process-audio calls a paid LLM and runs Whisper; /api/auth/handle
+allows handle enumeration; /api/billing/* touches Stripe. None are throttled,
+so cost and abuse scale with whatever an authenticated client chooses to send.
+
+Remediation: per-user and per-IP limits, tightest on /api/process-audio.
+
+--------------------------------------------------------------------------------
+6. MEDIUM - Interactive API docs and schema are public
+FIXED 2026-08-15: docs_url, redoc_url and openapi_url are None unless
+ENABLE_API_DOCS=true.
+
+--------------------------------------------------------------------------------
+Original finding:
+--------------------------------------------------------------------------------
+Evidence: geonix_wrench_backend/main.py:70
+    app = FastAPI(title="Geonix Wrench API")
+docs_url / redoc_url / openapi_url are not set, so FastAPI serves /docs,
+/redoc and /openapi.json to anyone, unauthenticated.
+
+Risk: publishes the full route map, parameter names and schemas to attackers.
+Not a vulnerability on its own; it removes all guesswork from finding one.
+
+Remediation: disable in production (docs_url=None, redoc_url=None,
+openapi_url=None) or gate them behind auth, driven by an env flag.
+
+--------------------------------------------------------------------------------
+7. MEDIUM - No length limits on text reaching the PDF generator or the LLM
+FIXED 2026-08-15: extract_jobcard() truncates the transcript to
+MAX_TRANSCRIPT_CHARS (20k) before it reaches either provider and logs when it
+does. pdf_generator._clip() bounds each field to MAX_FIELD_CHARS, strips
+control characters, and the parts table is capped at MAX_PARTS_PER_JOBCARD.
+
+--------------------------------------------------------------------------------
+Original finding:
+--------------------------------------------------------------------------------
+Evidence: no truncation, max_length or slicing in
+geonix_wrench_backend/pdf_generator.py or extraction.py. extract_jobcard()
+takes the transcript verbatim (extraction.py:63), and job card fields are
+passed straight into reportlab Paragraph objects.
+
+Risk: unbounded strings inflate LLM cost and can break or hang PDF rendering.
+Transcript text also lands in the prompt unmodified, so prompt injection can
+influence extraction. Pydantic validates the shape of the result, which
+limits the blast radius, but not the content.
+
+Remediation: cap transcript length before the prompt; cap field lengths and
+the parts-list size before rendering; strip control characters.
+
+--------------------------------------------------------------------------------
+8. UNRESOLVED / CANNOT VERIFY - Credential rotation
+--------------------------------------------------------------------------------
+On 2026-08-14 a live STRIPE_API_KEY (sk_live_), a STRIPE_WEBHOOK_SECRET
+(whsec_) and an ANTHROPIC_API_KEY (sk-ant-api03-) were visible on screen in a
+shared screenshot. They are no longer in git, but that does not revoke them.
+
+Rotation has never been confirmed. Treat all three as compromised until they
+have been rotated in the Stripe and Anthropic dashboards. This is the single
+highest-value item in this file: a live Stripe secret key can move money.
+
+--------------------------------------------------------------------------------
+9. LOW - Firebase web config remains in public repo history
+--------------------------------------------------------------------------------
+Evidence: github.com/geonixsoftware/geonix is public (GitHub API reports
+"private": false). assets/firebase-config.js was added in commit 38f2b82 and
+removed in 8263579, so it stays reachable in history.
+
+Risk: low by design. A Firebase web apiKey is a public identifier, not a
+secret; it ships in every web and app build. Security depends on Firebase
+security rules and the Authorized Domains list, not on hiding this value.
+
+Remediation: none required. Do confirm Authorized Domains is restricted to
+domains you control, and that Firestore/Storage rules are not permissive.
+
+================================================================================
+CHECKED AND FOUND SOUND
+================================================================================
+
+- Authentication coverage: every route except POST /api/billing/webhook
+  requires Depends(get_current_user). The webhook is correctly unauthenticated
+  and instead verified with stripe.Webhook.construct_event against
+  STRIPE_WEBHOOK_SECRET (billing.py).
+  NOTE: an earlier pass of this audit flagged POST /api/process-audio and
+  POST /api/shop-logo as unauthenticated. That was a false positive caused by
+  a pattern that did not span their multi-line signatures. Both do take
+  user: dict = Depends(get_current_user) (main.py:139 and main.py:215).
+
+- SQL injection: none found. Every statement in database.py uses "?"
+  placeholders; no f-string or concatenated SQL.
+
+- Authorization on seat changes: billing.update_team_seats() checks org
+  membership, owner role, plan minimum, and refuses to drop below the number
+  of seats actually occupied.
+
+- No hardcoded secrets in the Flutter app source.
+
+- Verbose auth error text is gated behind kDebugMode
+  (auth_exceptions.dart:21, 75, 107), so release builds do not leak codes.
+
+- Local file encryption keys are held in flutter_secure_storage
+  (file_cipher.dart:23), i.e. Keychain/Keystore rather than plaintext.
+
+================================================================================
+PRIORITISED ACTIONS
+================================================================================
+
+REMAINING (needs the owner):
+1. Rotate the Stripe secret key, Stripe webhook secret and Anthropic key. (8)
+2. Purge geonix_wrench.db from git history before sharing the repo.       (2)
+3. Set ALLOWED_ORIGINS in the deployed environment.                       (1)
+
+DONE 2026-08-15: findings 3, 4, 5, 6, 7 in full; 1 and 2 in code.
+CI now fails the build if a credential-shaped string appears in tracked files
+or anywhere in history (.github/workflows/ci.yml, "secrets" job).
 
 End of audit.

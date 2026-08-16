@@ -44,13 +44,12 @@ dependencies:
   http: ^1.2.0
   path_provider: ^2.1.2
   printing: ^5.13.3
+  file_selector: ^1.0.3
   intl: ^0.20.2
   uuid: ^4.5.1
   image_picker: ^1.1.2
   firebase_core: ^3.15.2
   firebase_auth: ^5.7.0
-  google_sign_in: ^6.3.0
-  sign_in_with_apple: ^6.1.4
   url_launcher: ^6.3.1
   # Local at-rest encryption for downloaded files (PDFs) + OS keystore/Keychain.
   encrypt: ^5.0.3

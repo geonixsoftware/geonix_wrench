@@ -9,7 +9,9 @@ import '../../core/models/member.dart';
 import '../../core/models/organization.dart';
 import '../../core/services/user_profile_service.dart';
 import '../../core/user/user_profile_controller.dart';
+import '../../shared/widgets/block_layout.dart';
 import '../../shared/widgets/surface_card.dart';
+import '../../core/theme/app_theme.dart';
 
 class OrganizationScreen extends StatefulWidget {
   const OrganizationScreen({super.key});
@@ -28,7 +30,6 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
   List<Invite> _myInvites = [];
 
   final _createNameController = TextEditingController();
-  int _createSeatLimit = 5;
   final _inviteHandleController = TextEditingController();
   final Set<int> _respondingInviteIds = {};
 
@@ -110,7 +111,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
 
     setState(() => _busy = true);
     try {
-      await _service.createOrganization(name, _createSeatLimit);
+      await _service.createOrganization(name);
       if (!mounted) return;
       await context.read<UserProfileController>().refresh();
       await _load();
@@ -257,26 +258,40 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
     final l10n = context.l10n;
     final profile = context.watch<UserProfileController>().profile;
 
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.t(AppStrings.orgScreenTitle))),
-      body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: _org == null
-                    ? _buildNoOrgView(context)
-                    : (profile?.isOwner ?? false)
-                        ? _buildOwnerView(context, _org!)
-                        : _buildMemberView(context, _org!),
-              ),
+    return BlockScaffold(
+      header: BlockTitleHeader(
+        // The shop's own name is the headline once it exists; the generic
+        // screen title steps back to the eyebrow above it.
+        eyebrow: _org == null ? null : l10n.t(AppStrings.orgScreenTitle),
+        title: _org?.name ?? l10n.t(AppStrings.orgScreenTitle),
       ),
+      child: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.space5,
+                AppTheme.space6,
+                AppTheme.space5,
+                AppTheme.space10,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: _org == null
+                      ? _buildNoOrgView(context)
+                      : (profile?.isOwner ?? false)
+                          ? _buildOwnerView(context, _org!)
+                          : _buildMemberView(context, _org!),
+                ),
+              ),
+            ),
     );
   }
 
   Widget _buildNoOrgView(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final p = context.palette;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,17 +306,9 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                 controller: _createNameController,
                 decoration: InputDecoration(labelText: l10n.t(AppStrings.orgCreateNameLabel)),
               ),
-              const SizedBox(height: 12),
-              Text(l10n.t(AppStrings.orgCreateSeatLimitLabel), style: theme.textTheme.labelMedium),
-              const SizedBox(height: 8),
-              SegmentedButton<int>(
-                segments: const [
-                  ButtonSegment(value: 5, label: Text('5')),
-                  ButtonSegment(value: 10, label: Text('10')),
-                ],
-                selected: {_createSeatLimit},
-                onSelectionChanged: (selection) => setState(() => _createSeatLimit = selection.first),
-              ),
+              // No seat picker: the shop's seat count comes from the owner's
+              // Team subscription, which the server reads directly. Picking a
+              // number here let a shop claim seats nobody had paid for.
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: _busy ? null : _createOrganization,
@@ -321,7 +328,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                 Text(
                   l10n.t(AppStrings.orgNoPendingInvites),
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    color: p.inkTertiary,
                   ),
                 )
               else
@@ -354,6 +361,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
   Widget _buildMemberView(BuildContext context, Organization org) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final p = context.palette;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,7 +378,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                     .replaceAll('{used}', '${org.seatUsed}')
                     .replaceAll('{limit}', '${org.seatLimit}'),
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: p.inkSecondary,
                 ),
               ),
             ],
@@ -402,6 +410,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
   Widget _buildOwnerView(BuildContext context, Organization org) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final p = context.palette;
     final myUserId = context.watch<UserProfileController>().profile?.id;
 
     return Column(
@@ -419,7 +428,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                     .replaceAll('{used}', '${org.seatUsed}')
                     .replaceAll('{limit}', '${org.seatLimit}'),
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: p.inkSecondary,
                 ),
               ),
             ],
@@ -461,7 +470,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                 Text(
                   l10n.t(AppStrings.orgNoPendingInvites),
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    color: p.inkTertiary,
                   ),
                 )
               else
@@ -520,28 +529,26 @@ class _InviteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final l10n = context.l10n;
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
+    return SurfaceWell(
+      radius: AppTheme.radiusLg,
+      padding: const EdgeInsets.all(AppTheme.space3),
       child: Row(
         children: [
+          const IconTile(Icons.mark_email_unread_outlined, size: 38),
+          const SizedBox(width: AppTheme.space3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(invite.orgName, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(invite.orgName, style: theme.textTheme.titleSmall),
                 if (invite.invitedByHandle != null)
                   Text(
                     l10n.t(AppStrings.orgInvitedByLabel).replaceAll('{userName}', invite.invitedByHandle!),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(color: p.inkTertiary),
                   ),
               ],
             ),
@@ -564,30 +571,47 @@ class _MemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final label = member.displayName?.isNotEmpty == true
         ? member.displayName!
         : (member.handle ?? '');
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
+    // Initial-letter avatar rather than a bare name: with several members
+    // stacked, the identical grey rows were impossible to scan.
+    final initial = label.isEmpty ? '?' : label.characters.first.toUpperCase();
+
+    return SurfaceWell(
+      radius: AppTheme.radiusLg,
+      padding: const EdgeInsets.all(AppTheme.space3),
       child: Row(
         children: [
-          Expanded(
-            child: Text(label, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: p.secondarySoft, shape: BoxShape.circle),
+            child: Text(
+              initial,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: p.secondary,
+              ),
+            ),
           ),
-          Text(
-            member.orgRole,
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-          ),
+          const SizedBox(width: AppTheme.space3),
+          Expanded(child: Text(label, style: theme.textTheme.titleSmall)),
+          ToneChip(label: member.orgRole, tone: ChipTone.neutral),
           if (onRemove != null) ...[
-            const SizedBox(width: 8),
-            TextButton(onPressed: onRemove, child: Text(l10n.t(AppStrings.orgMemberRemove))),
+            const SizedBox(width: AppTheme.space1),
+            IconButton(
+              onPressed: onRemove,
+              icon: const Icon(Icons.person_remove_outlined, size: 18),
+              tooltip: l10n.t(AppStrings.orgMemberRemove),
+              color: p.inkTertiary,
+            ),
           ],
         ],
       ),

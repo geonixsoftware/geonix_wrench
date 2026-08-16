@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme.dart';
+
+/// The primary record control.
+///
+/// A solid disc inside a soft concentric ring — the shape the reference UIs
+/// use for their one hero control. While recording, the ring breathes outward
+/// once per cycle instead of the stacked translucent circles the previous
+/// version drew.
 class RecordButton extends StatefulWidget {
   const RecordButton({
     super.key,
     required this.isRecording,
     required this.onPressed,
     this.disabled = false,
-    this.size = 152,
+    this.size = 132,
   });
 
   final bool isRecording;
@@ -18,94 +26,106 @@ class RecordButton extends StatefulWidget {
   State<RecordButton> createState() => _RecordButtonState();
 }
 
-class _RecordButtonState extends State<RecordButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulseController;
+class _RecordButtonState extends State<RecordButton> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    );
-    if (widget.isRecording) {
-      _pulseController.repeat(reverse: true);
-    }
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600));
+    if (widget.isRecording) _pulse.repeat();
   }
 
   @override
   void didUpdateWidget(RecordButton oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isRecording && !oldWidget.isRecording) {
-      _pulseController.repeat(reverse: true);
+      _pulse.repeat();
     } else if (!widget.isRecording && oldWidget.isRecording) {
-      _pulseController.stop();
-      _pulseController.value = 0;
+      _pulse
+        ..stop()
+        ..value = 0;
     }
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
+    _pulse.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final danger = theme.colorScheme.error;
-    final accent = theme.colorScheme.primary;
-    final color = widget.disabled
-        ? theme.colorScheme.onSurface.withValues(alpha: 0.35)
-        : (widget.isRecording ? danger : accent);
+    final p = context.palette;
 
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, child) {
-        final pulse = widget.isRecording ? _pulseController.value : 0.0;
-        return SizedBox(
-          width: widget.size + 24,
-          height: widget.size + 24,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              if (widget.isRecording)
-                Container(
-                  width: widget.size + (16 * pulse),
-                  height: widget.size + (16 * pulse),
+    final Color fill;
+    final Color foreground;
+    if (widget.disabled) {
+      fill = p.surfaceSunken;
+      foreground = p.inkTertiary;
+    } else if (widget.isRecording) {
+      fill = p.danger;
+      foreground = Colors.white;
+    } else {
+      fill = p.accent;
+      foreground = p.onAccent;
+    }
+
+    final halo = widget.size + 40;
+
+    return SizedBox(
+      width: halo,
+      height: halo,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Resting ring. Present in every state so the control keeps the same
+          // footprint whether or not the pulse is running.
+          Container(
+            width: halo,
+            height: halo,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: widget.disabled
+                  ? p.surfaceMuted
+                  : fill.withValues(alpha: 0.10),
+            ),
+          ),
+          if (widget.isRecording && !widget.disabled)
+            AnimatedBuilder(
+              animation: _pulse,
+              builder: (context, _) {
+                final t = _pulse.value;
+                return Container(
+                  width: widget.size + (halo - widget.size) * t,
+                  height: widget.size + (halo - widget.size) * t,
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.06 * (1 - pulse)),
                     shape: BoxShape.circle,
-                    border: Border.all(color: color.withValues(alpha: 0.10 * (1 - pulse))),
+                    color: p.danger.withValues(alpha: 0.18 * (1 - t)),
                   ),
-                ),
-              Material(
-                color: color.withValues(alpha: 0.08),
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: widget.onPressed,
-                  child: Container(
-                    width: widget.size,
-                    height: widget.size,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      widget.isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                      color: color,
-                      size: widget.size * 0.36,
-                    ),
-                  ),
+                );
+              },
+            ),
+          Material(
+            color: fill,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              // The flag used to only tint the button while leaving it tappable.
+              onTap: widget.disabled ? null : widget.onPressed,
+              child: SizedBox(
+                width: widget.size,
+                height: widget.size,
+                child: Icon(
+                  widget.isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                  color: foreground,
+                  size: widget.size * 0.36,
                 ),
               ),
-            ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

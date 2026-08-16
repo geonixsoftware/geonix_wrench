@@ -397,6 +397,49 @@ def get_subscription(scope_type: str, scope_id: int) -> Optional[Dict[str, Any]]
         return _subscription_row_to_dict(row) if row else None
 
 
+def move_subscription_scope(
+    *,
+    from_scope_type: str,
+    from_scope_id: int,
+    to_scope_type: str,
+    to_scope_id: int,
+) -> Optional[Dict[str, Any]]:
+    """Re-point an existing subscription at a different scope.
+
+    The Team plan can be bought before the shop exists, in which case the
+    subscription is held against the buyer. Naming the shop moves that same
+    Stripe subscription onto the org so seats, the billing portal and the
+    member limit all resolve against the shop from then on.
+    """
+    with get_connection() as conn:
+        # (scope_type, scope_id) is unique; clear any stale row at the target
+        # so the move cannot violate the constraint.
+        conn.execute(
+            "DELETE FROM subscriptions WHERE scope_type = ? AND scope_id = ?",
+            (to_scope_type, to_scope_id),
+        )
+        conn.execute(
+            """
+            UPDATE subscriptions
+               SET scope_type = ?, scope_id = ?, updated_at = ?
+             WHERE scope_type = ? AND scope_id = ?
+            """,
+            (
+                to_scope_type,
+                to_scope_id,
+                datetime.now(timezone.utc).isoformat(),
+                from_scope_type,
+                from_scope_id,
+            ),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM subscriptions WHERE scope_type = ? AND scope_id = ?",
+            (to_scope_type, to_scope_id),
+        ).fetchone()
+        return _subscription_row_to_dict(row) if row else None
+
+
 def upsert_subscription(
     *,
     scope_type: str,

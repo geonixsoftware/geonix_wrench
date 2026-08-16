@@ -16,9 +16,19 @@ class UserProfileController extends ChangeNotifier {
   UserProfile? _profile;
   bool _isLoading = false;
   bool _wasSignedIn = false;
+  bool _loadFailed = false;
 
   UserProfile? get profile => _profile;
   bool get isLoading => _isLoading;
+
+  /// True only while the very first fetch is in flight. Every screen action
+  /// (renaming the shop, inviting, accepting) calls [refresh]; gating the whole
+  /// app on plain [isLoading] made each one tear the tree down to a spinner and
+  /// build it back, which is what showed up as flickering.
+  bool get isInitialLoad => _isLoading && _profile == null;
+
+  /// A refresh failed and we have nothing cached to fall back on.
+  bool get hasFailed => _loadFailed && _profile == null;
 
   void _onAuthChanged() {
     final signedIn = _authService.isSignedIn;
@@ -28,6 +38,7 @@ class UserProfileController extends ChangeNotifier {
     } else if (!signedIn && _wasSignedIn) {
       _wasSignedIn = false;
       _profile = null;
+      _loadFailed = false;
       notifyListeners();
     }
   }
@@ -38,8 +49,11 @@ class UserProfileController extends ChangeNotifier {
     notifyListeners();
     try {
       _profile = await _service.fetchMe();
+      _loadFailed = false;
     } catch (_) {
-      _profile = null;
+      // Keep the last good profile. Dropping it on a transient network blip
+      // bounced the user out to the retry screen mid-task.
+      _loadFailed = true;
     } finally {
       _isLoading = false;
       notifyListeners();

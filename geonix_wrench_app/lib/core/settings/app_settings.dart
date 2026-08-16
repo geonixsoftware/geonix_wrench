@@ -142,16 +142,23 @@ class AppSettings extends ChangeNotifier {
   static const _themeKey = 'settings.theme_mode';
   static const _languageKey = 'settings.language';
   static const _currencyKey = 'settings.currency';
+  static const _pdfDirectoryKey = 'settings.pdf_directory';
 
   AppThemeMode _themeMode = AppThemeMode.system;
   AppLanguage _language = AppLanguage.english;
   AppCurrency _currency = AppCurrency.eur;
+  String? _pdfDirectory;
   bool _loaded = false;
 
   AppThemeMode get themeMode => _themeMode;
   AppLanguage get language => _language;
   AppCurrency get currency => _currency;
   bool get isLoaded => _loaded;
+
+  /// Where generated job-card PDFs are written. `null` means "wherever the
+  /// platform puts downloads" — resolved at save time rather than stored, so
+  /// the default keeps working if the OS moves the folder.
+  String? get pdfDirectory => _pdfDirectory;
 
   ThemeMode get flutterThemeMode {
     switch (_themeMode) {
@@ -182,6 +189,7 @@ class AppSettings extends ChangeNotifier {
     if (currencyCode != null) {
       _currency = AppCurrencyDetails.fromCode(currencyCode);
     }
+    _pdfDirectory = prefs.getString(_pdfDirectoryKey);
 
     _loaded = true;
     notifyListeners();
@@ -206,5 +214,17 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_currencyKey, currency.code);
+  }
+
+  /// Pass `null` to go back to the platform's downloads folder.
+  Future<void> setPdfDirectory(String? path) async {
+    _pdfDirectory = path;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (path == null) {
+      await prefs.remove(_pdfDirectoryKey);
+    } else {
+      await prefs.setString(_pdfDirectoryKey, path);
+    }
   }
 }

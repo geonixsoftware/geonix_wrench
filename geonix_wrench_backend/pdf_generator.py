@@ -1,4 +1,5 @@
 import io
+from datetime import datetime
 from typing import Any, Dict
 
 from reportlab.lib import colors
@@ -15,11 +16,52 @@ from reportlab.platypus import (
 )
 from PIL import Image as PILImage
 
-from config import DEFAULT_CURRENCY, DEFAULT_LABOR_RATE, SUPPORTED_CURRENCIES
+from config import (
+    DEFAULT_CURRENCY,
+    DEFAULT_LABOR_RATE,
+    MAX_FIELD_CHARS,
+    MAX_PARTS_PER_JOBCARD,
+    SUPPORTED_CURRENCIES,
+)
 from logo_storage import get_active_logo_path
+from scoping import OwnerScope
 
 BRAND_COLOR = colors.HexColor("#1F3A5F")
 ACCENT_COLOR = colors.HexColor("#F2A900")
+
+
+def _clip(text: object, limit: int = MAX_FIELD_CHARS) -> str:
+    """Bound a field before it reaches reportlab.
+
+    Long or control-character-laden strings can stall or break Paragraph
+    layout, and nothing upstream constrained these — they come from an LLM
+    reading a user's speech.
+    """
+    value = "" if text is None else str(text)
+    value = "".join(ch for ch in value if ch == "\n" or ch >= " ")
+    if len(value) > limit:
+        value = value[: limit - 1].rstrip() + "\u2026"
+    return value
+
+
+
+def _format_date(value: Any) -> str:
+    """Render a stored timestamp as a readable date.
+
+    The header printed `created_at` verbatim, so every customer-facing job card
+    carried a raw ISO timestamp ("2026-08-15T10:00:00+00:00") where a date
+    belongs. Unparseable values fall back to the original string rather than
+    dropping the date from an invoice.
+    """
+    if not value:
+        return ""
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except ValueError:
+        return str(value)
+    # Day first, spelled-out month: unambiguous for the European shops this is
+    # sold to, unlike a numeric-only format.
+    return f"{parsed.day} {parsed.strftime('%B %Y')}"
 
 
 def _format_labor_time(hours: float) -> str:
@@ -32,8 +74,8 @@ def _format_labor_time(hours: float) -> str:
     return f"{m}m"
 
 
-def _build_header_image() -> Image:
-    logo_path = get_active_logo_path()
+def _build_header_image(owner: OwnerScope) -> Image:
+    logo_path = get_active_logo_path(owner)
     with PILImage.open(logo_path) as img:
         width_px, height_px = img.size
     max_height = 0.5 * inch
@@ -42,7 +84,12 @@ def _build_header_image() -> Image:
     return Image(logo_path, width=width_px * scale, height=height_px * scale, hAlign="LEFT")
 
 
-def generate_jobcard_pdf(jobcard: Dict[str, Any], currency: str = DEFAULT_CURRENCY, labor_rate: float = DEFAULT_LABOR_RATE) -> bytes:
+def generate_jobcard_pdf(
+    jobcard: Dict[str, Any],
+    owner: OwnerScope,
+    currency: str = DEFAULT_CURRENCY,
+    labor_rate: float = DEFAULT_LABOR_RATE,
+) -> bytes:
     currency = currency.upper() if currency.upper() in SUPPORTED_CURRENCIES else DEFAULT_CURRENCY
     symbol = SUPPORTED_CURRENCIES[currency]
 
@@ -65,17 +112,19 @@ def generate_jobcard_pdf(jobcard: Dict[str, Any], currency: str = DEFAULT_CURREN
     body_style = styles["BodyText"]
 
     elements = []
-    elements.append(_build_header_image())
+    elements.append(_build_header_image(owner))
     elements.append(Spacer(1, 0.15 * inch))
     elements.append(Paragraph(f"Estimate / Invoice — Job Card #{jobcard['id']}", subtitle_style))
-    elements.append(Paragraph(f"Date: {jobcard['created_at']}", subtitle_style))
+    elements.append(
+        Paragraph(f"Date: {_format_date(jobcard['created_at'])}", subtitle_style)
+    )
     elements.append(Spacer(1, 0.25 * inch))
 
     elements.append(Paragraph("Vehicle Information", section_style))
-    elements.append(Paragraph(jobcard["vehicle_info"], body_style))
+    elements.append(Paragraph(_clip(jobcard["vehicle_info"]), body_style))
 
     elements.append(Paragraph("Work Performed", section_style))
-    elements.append(Paragraph(jobcard["work_performed"], body_style))
+    elements.append(Paragraph(_clip(jobcard["work_performed"]), body_style))
 
     elements.append(Paragraph("Labor & Parts", section_style))
 
@@ -90,16 +139,18 @@ def generate_jobcard_pdf(jobcard: Dict[str, Any], currency: str = DEFAULT_CURREN
 
     parts_total = 0.0
     has_tbd_parts = False
-    for part in jobcard["parts_used"]:
+    # Cap the row count as well as each field; an LLM can return an
+    # arbitrarily long parts list.
+    for part in jobcard["parts_used"][:MAX_PARTS_PER_JOBCARD]:
         unit_price = part.get("unit_price")
         if unit_price is None:
             has_tbd_parts = True
-            line_items.append([part["part_name"], str(part["quantity"]), "TBD", "TBD"])
+            line_items.append([_clip(part["part_name"], 200), str(part["quantity"]), "TBD", "TBD"])
         else:
             amount = unit_price * part["quantity"]
             parts_total += amount
             line_items.append([
-                part["part_name"],
+                _clip(part["part_name"], 200),
                 str(part["quantity"]),
                 f"{symbol} {unit_price:,.2f}",
                 f"{symbol} {amount:,.2f}",

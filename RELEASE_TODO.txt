@@ -1,0 +1,189 @@
+Geonix Wrench - what still needs doing before release
+Written 2026-08-15. Updated the same day: everything that could be done
+without owner input has been done and moved to the DONE section at the
+bottom. What is left below genuinely needs credentials, accounts, money or a
+product decision.
+
+Ordered by what blocks a release, not by effort. Items marked [BLOCKER] mean a
+paying customer would hit a broken or unsafe path on day one.
+
+
+================================================================================
+BLOCKERS
+================================================================================
+
+[BLOCKER] Rotate the three exposed credentials
+    A live Stripe secret key (sk_live_), the Stripe webhook secret (whsec_)
+    and an Anthropic key (sk-ant-api03-) were visible on screen on 2026-08-14.
+    They are out of git now, but that does not revoke them. Rotation has never
+    been confirmed. A live Stripe secret key can move money.
+    -> Rotate in the Stripe and Anthropic dashboards, then update .env.
+    Detail: security.txt, finding 8.
+
+[BLOCKER] The backend is not deployed anywhere
+    There is no public API. Everything below that touches the server depends
+    on this being done first.
+    -> Deploy geonix_wrench_backend somewhere with HTTPS and a real hostname.
+
+[BLOCKER] Release builds need an API host passed in
+    The dead default (https://api.geonixsoftware.com, which is NXDOMAIN) has
+    been removed. Release builds now have NO default and fail immediately at
+    startup with an explanatory error instead of dying on every request.
+    -> Build with: --dart-define=API_BASE_URL=https://your-real-api
+    Still a blocker only because there is no host to point at yet.
+
+[BLOCKER] Stripe prices do not necessarily match what the site advertises
+    The site and app advertise EUR 29/month (Individual) and EUR 25/seat/month
+    (Team, minimum 2). Stripe charges whatever its price objects hold, which
+    is independent of those numbers.
+    -> Run: cd geonix_wrench_backend && ./venv/bin/python -m price_check
+       It compares both Stripe price objects against the advertised values and
+       exits non-zero on a mismatch. It needs the live STRIPE_API_KEY, so it
+       has never actually been run.
+    Stripe price amounts are immutable, so this most likely means creating new
+    prices and updating INDIVIDUAL_PRICE_ID / TEAM_PRICE_ID in config.py.
+
+[BLOCKER] Managed Payments opt-out is unverified against live Stripe
+    Checkout previously failed with "this product tax code is ineligible for
+    Managed Payments". The fix passes managed_payments={"enabled": False}
+    (billing.py). It is covered by a unit test and the parameter encoding was
+    checked offline, but no real checkout has ever completed.
+    -> Complete one real end-to-end purchase before launch.
+
+[BLOCKER] No app builds exist to download
+    The website's download section lists App Store, Google Play, .dmg, .exe
+    and .deb, all as disabled "Coming soon" placeholders.
+    -> Produce the builds, then activate each row. The markup carries a
+       comment showing the swap: <span class="dl"> becomes
+       <a class="dl" href="..."> and the "Coming soon" line is deleted.
+    Sub-tasks: Apple Developer Program membership and App Store review,
+    Google Play Console listing and review, code signing and notarisation for
+    the .dmg, signing for the .exe.
+
+
+================================================================================
+SECURITY - see security.txt for evidence and remediation
+================================================================================
+
+All seven code-side findings from security.txt are fixed. What remains needs
+you:
+
+[OWNER]  Rotate the Stripe secret key, webhook secret and Anthropic key.
+[OWNER]  Purge geonix_wrench.db from git history before sharing the repo.
+         It is untracked and ignored now, but the blob is still in the two
+         existing commits. History rewriting is destructive and this repo has
+         no remote to recover from, so it was left for you.
+[OWNER]  Set ALLOWED_ORIGINS in the deployed environment. Until it is set the
+         API allows any origin but WITHOUT credentials, and warns at startup.
+
+
+================================================================================
+PLATFORM / SIGNING
+================================================================================
+
+macOS provisioning profile expires 2026-08-22
+    The current build is signed with a free Apple ID "Personal Team" profile,
+    which lasts 7 days. When it lapses, Firebase Auth fails again with
+    keychain-error, because the data-protection keychain needs a
+    profile-backed keychain access group.
+    -> A paid Apple Developer account removes the 7-day cycle. Otherwise the
+       app must be rebuilt through Xcode weekly.
+
+Android has never been built
+    google-services.json is only present as .example. The SHA-1 fingerprint
+    has never been registered with Firebase, so Android auth is untested.
+
+Windows and Linux have never been built or tested
+    The site advertises .exe and .deb. Neither has been produced.
+
+iOS has never been built or tested on a device.
+
+
+================================================================================
+PRODUCT GAPS
+================================================================================
+
+No custom domain
+    geonixsoftware.com does not resolve. The site currently lives at
+    geonixsoftware.github.io/geonix, and the app's Stripe return URLs point
+    there (app_config.dart:37). Buying the domain means updating:
+      - GitHub Pages custom domain settings
+      - WEB_BASE_URL default in app_config.dart
+      - Firebase Authentication -> Authorized domains
+
+Seat downgrade requires manual member removal
+    update_team_seats() refuses to drop below occupied seats, which is correct,
+    but the owner has to go remove members elsewhere first. No guided flow.
+
+No account deletion
+    No way for a user to delete their account or data. Likely required for
+    App Store review and for GDPR, given the EUR pricing implies EU customers.
+
+No privacy policy or terms
+    Both stores require a privacy policy URL. Neither exists.
+
+Password reset emails land in spam
+    Confirmed during testing. Firebase's default sender has poor deliverability.
+    -> Configure a custom SMTP sender and verified domain in Firebase Auth.
+
+
+================================================================================
+ENGINEERING DEBT
+================================================================================
+
+Flutter tests are thin
+    11 tests, mostly around auth error mapping and billing status parsing.
+    No widget or integration coverage of the record -> review -> PDF flow,
+    which is the core product path.
+
+The theme specimen golden is platform-sensitive
+    test/theme_specimen_test.dart is tagged "golden" and can be skipped with
+    flutter test --exclude-tags golden. It will fail on a different Flutter
+    version or host OS. Regenerate rather than debug:
+    flutter test --update-goldens test/theme_specimen_test.dart
+
+Non-English translations are incomplete
+    New billing and auth strings were only added to strings_en.dart. The other
+    nine locales fall back to English at runtime, so they are not broken, but
+    they are partially untranslated.
+
+The site's pricing is hardcoded in three places
+    Backend config.py is the source of truth and serves price_per_seat to the
+    app, but geonix_website/geonix_wrench.html and index.html carry the
+    numbers as literal text. Changing a price means editing the site too.
+
+
+================================================================================
+DONE - recorded so it is not redone
+================================================================================
+
+- Website rebuilt: no web checkout, no web sign-in, download-led. Pure HTML
+  and CSS, no JavaScript. Live at geonixsoftware.github.io/geonix
+- Dark mode across site and app, sharing one palette.
+- Mobile layout verified at 320/360/375/390/414/430px, no overflow.
+- Both logos (Geonix Wrench + Geonix) in the product page header, each linking
+  to its own page; company mark added to the home page.
+- App theme rebuilt on tonal surfaces; flicker on profile/billing refresh
+  fixed; AppHeader, AudioVisualizer and RecordButton layout bugs fixed.
+- Seat management: purchase and post-purchase changes, minimum 2, no maximum.
+- .env, venv/ and the service account are out of git and ignored.
+- Firebase Hosting deployment was taken down in favour of GitHub Pages.
+
+Added 2026-08-15 (security + release work, no owner input needed):
+- CORS locked to ALLOWED_ORIGINS; credentialed wildcard removed.
+- Audio and logo uploads streamed under a byte cap, with an early
+  Content-Length rejection. Audio was previously unbounded.
+- Per-user rate limiting, tightest on /api/process-audio.
+- /docs, /redoc and /openapi.json disabled unless ENABLE_API_DOCS=true.
+- Transcript capped before the LLM prompt; PDF fields clipped, control
+  characters stripped, parts table bounded.
+- geonix_wrench.db untracked; *.db and *.sqlite3 ignored.
+- Stripe Billing Portal: new POST /api/billing/portal-session and a
+  "Manage subscription" card in the app, so cancel / change card / invoices
+  no longer require emailing support.
+- Webhook now handles invoice.payment_failed and invoice.payment_succeeded,
+  so a subscription that lapses for non-payment reflects correctly.
+- Release builds fail loudly when API_BASE_URL is missing.
+- GitHub Actions CI: backend pytest, Flutter analyze + test, and a secret
+  scan over both tracked files and full history.
+- Test count: backend 52 -> 71, app 11.

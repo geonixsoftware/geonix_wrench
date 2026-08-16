@@ -7,7 +7,10 @@ import '../../core/l10n/app_strings.dart';
 import '../../core/models/invite.dart';
 import '../../core/services/user_profile_service.dart';
 import '../../core/user/user_profile_controller.dart';
+import '../../shared/widgets/block_layout.dart';
 import '../../shared/widgets/surface_card.dart';
+import 'login_screen.dart';
+import '../../core/theme/app_theme.dart';
 
 class OrgOnboardingScreen extends StatefulWidget {
   const OrgOnboardingScreen({super.key, required this.onSkip});
@@ -22,7 +25,6 @@ class _OrgOnboardingScreenState extends State<OrgOnboardingScreen> {
   late final UserProfileService _service;
   bool _showCreateForm = false;
   bool _creating = false;
-  int _seatLimit = 5;
   final _nameController = TextEditingController();
 
   bool _loadingInvites = true;
@@ -67,7 +69,7 @@ class _OrgOnboardingScreenState extends State<OrgOnboardingScreen> {
 
     setState(() => _creating = true);
     try {
-      await _service.createOrganization(name, _seatLimit);
+      await _service.createOrganization(name);
       if (!mounted) return;
       await context.read<UserProfileController>().refresh();
     } on UserProfileException catch (e) {
@@ -103,112 +105,112 @@ class _OrgOnboardingScreenState extends State<OrgOnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final l10n = context.l10n;
     final theme = Theme.of(context);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    return AuthBlockScaffold(
+      title: l10n.t(AppStrings.orgOnboardingTitle),
+      subtitle: l10n.t(AppStrings.orgOnboardingDescription),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!_showCreateForm) ...[
+            // The two paths are given equal weight as picture-led cards
+            // instead of a stacked button pair, because "work solo" is a real
+            // choice here and not a dismissal.
+            SurfaceCard(
+              padding: const EdgeInsets.all(AppTheme.space5),
+              onTap: () => setState(() => _showCreateForm = true),
+              child: Row(
                 children: [
-                  SurfaceCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(l10n.t(AppStrings.orgOnboardingTitle), style: theme.textTheme.titleLarge),
-                        const SizedBox(height: 12),
-                        Text(
-                          l10n.t(AppStrings.orgOnboardingDescription),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        if (!_showCreateForm) ...[
-                          ElevatedButton(
-                            onPressed: () => setState(() => _showCreateForm = true),
-                            child: Text(l10n.t(AppStrings.orgOnboardingCreateShop)),
-                          ),
-                          const SizedBox(height: 12),
-                          OutlinedButton(
-                            onPressed: widget.onSkip,
-                            child: Text(l10n.t(AppStrings.orgOnboardingSkip)),
-                          ),
-                        ] else ...[
-                          TextFormField(
-                            controller: _nameController,
-                            decoration: InputDecoration(labelText: l10n.t(AppStrings.orgCreateNameLabel)),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(l10n.t(AppStrings.orgCreateSeatLimitLabel), style: theme.textTheme.labelMedium),
-                          const SizedBox(height: 8),
-                          SegmentedButton<int>(
-                            segments: const [
-                              ButtonSegment(value: 5, label: Text('5')),
-                              ButtonSegment(value: 10, label: Text('10')),
-                            ],
-                            selected: {_seatLimit},
-                            onSelectionChanged: (selection) => setState(() => _seatLimit = selection.first),
-                          ),
-                          const SizedBox(height: 20),
-                          ElevatedButton(
-                            onPressed: _creating ? null : _createOrganization,
-                            child: _creating
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                  )
-                                : Text(l10n.t(AppStrings.orgCreateSubmit)),
-                          ),
-                          const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: _creating ? null : () => setState(() => _showCreateForm = false),
-                            child: Text(l10n.t(AppStrings.cancel)),
-                          ),
-                        ],
-                      ],
+                  const IconTile(Icons.storefront_outlined, size: 46, tone: TileTone.accent),
+                  const SizedBox(width: AppTheme.space4),
+                  Expanded(
+                    child: Text(
+                      l10n.t(AppStrings.orgOnboardingCreateShop),
+                      style: theme.textTheme.titleSmall,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  SurfaceCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(l10n.t(AppStrings.orgOnboardingPendingInvitesTitle), style: theme.textTheme.titleMedium),
-                        const SizedBox(height: 12),
-                        if (_loadingInvites)
-                          const Center(child: CircularProgressIndicator(strokeWidth: 2))
-                        else if (_invites.isEmpty)
-                          Text(
-                            l10n.t(AppStrings.orgNoPendingInvites),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                            ),
-                          )
-                        else
-                          for (final invite in _invites) ...[
-                            _InviteRow(
-                              invite: invite,
-                              busy: _respondingInviteIds.contains(invite.id),
-                              onAccept: () => _respondToInvite(invite, true),
-                              onDecline: () => _respondToInvite(invite, false),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                      ],
-                    ),
-                  ),
+                  Icon(Icons.chevron_right_rounded, color: p.inkTertiary),
                 ],
               ),
             ),
-          ),
-        ),
+            const SizedBox(height: AppTheme.space3),
+            SurfaceCard(
+              padding: const EdgeInsets.all(AppTheme.space5),
+              onTap: widget.onSkip,
+              child: Row(
+                children: [
+                  const IconTile(Icons.person_outline_rounded, size: 46),
+                  const SizedBox(width: AppTheme.space4),
+                  Expanded(
+                    child: Text(
+                      l10n.t(AppStrings.orgOnboardingSkip),
+                      style: theme.textTheme.titleSmall,
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: p.inkTertiary),
+                ],
+              ),
+            ),
+          ] else ...[
+            TextFormField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                labelText: l10n.t(AppStrings.orgCreateNameLabel),
+                prefixIcon: const Icon(Icons.storefront_outlined),
+              ),
+            ),
+            // No seat picker: the shop gets exactly the seats its owner's Team
+            // subscription paid for, which the server owns. Choosing a number
+            // here produced shops with more seats than were ever purchased.
+            const SizedBox(height: AppTheme.space6),
+            ElevatedButton(
+              onPressed: _creating ? null : _createOrganization,
+              child: _creating
+                  ? SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: p.onAccent),
+                    )
+                  : Text(l10n.t(AppStrings.orgCreateSubmit)),
+            ),
+            const SizedBox(height: AppTheme.space2),
+            TextButton(
+              onPressed: _creating ? null : () => setState(() => _showCreateForm = false),
+              child: Text(l10n.t(AppStrings.cancel)),
+            ),
+          ],
+          const SizedBox(height: AppTheme.space10),
+          SectionHeading(title: l10n.t(AppStrings.orgOnboardingPendingInvitesTitle)),
+          const SizedBox(height: AppTheme.space4),
+          if (_loadingInvites)
+            const Center(child: CircularProgressIndicator(strokeWidth: 2))
+          else if (_invites.isEmpty)
+            SurfaceWell(
+              radius: AppTheme.radiusLg,
+              padding: const EdgeInsets.symmetric(
+                vertical: AppTheme.space6,
+                horizontal: AppTheme.space5,
+              ),
+              child: Text(
+                l10n.t(AppStrings.orgNoPendingInvites),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(color: p.inkTertiary),
+              ),
+            )
+          else
+            for (final invite in _invites) ...[
+              _InviteRow(
+                invite: invite,
+                busy: _respondingInviteIds.contains(invite.id),
+                onAccept: () => _respondToInvite(invite, true),
+                onDecline: () => _respondToInvite(invite, false),
+              ),
+              if (invite != _invites.last) const SizedBox(height: AppTheme.space3),
+            ],
+        ],
       ),
     );
   }
@@ -229,38 +231,64 @@ class _InviteRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final l10n = context.l10n;
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
+    return SurfaceCard(
+      padding: const EdgeInsets.all(AppTheme.space4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            children: [
+              const IconTile(Icons.mark_email_unread_outlined, size: 42),
+              const SizedBox(width: AppTheme.space3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(invite.orgName, style: theme.textTheme.titleSmall),
+                    if (invite.invitedByHandle != null)
+                      Text(
+                        l10n
+                            .t(AppStrings.orgInvitedByLabel)
+                            .replaceAll('{userName}', invite.invitedByHandle!),
+                        style: theme.textTheme.bodySmall?.copyWith(color: p.inkTertiary),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.space4),
+          if (busy)
+            const Center(
+              child: SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            // Full-width side-by-side rather than two right-aligned links: on a
+            // phone the old row put Decline and Accept a thumb-width apart at
+            // the far edge of the card.
+            Row(
               children: [
-                Text(invite.orgName, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-                if (invite.invitedByHandle != null)
-                  Text(
-                    l10n.t(AppStrings.orgInvitedByLabel).replaceAll('{userName}', invite.invitedByHandle!),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onDecline,
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+                    child: Text(l10n.t(AppStrings.orgInviteDecline)),
                   ),
+                ),
+                const SizedBox(width: AppTheme.space3),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: onAccept,
+                    style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+                    child: Text(l10n.t(AppStrings.orgInviteAccept)),
+                  ),
+                ),
               ],
             ),
-          ),
-          if (busy)
-            const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-          else ...[
-            TextButton(onPressed: onDecline, child: Text(l10n.t(AppStrings.orgInviteDecline))),
-            FilledButton.tonal(onPressed: onAccept, child: Text(l10n.t(AppStrings.orgInviteAccept))),
-          ],
         ],
       ),
     );
