@@ -43,3 +43,17 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(HTTPBea
         raise HTTPException(status_code=401, detail="Invalid or expired token") from None
 
     return database.get_or_create_user(firebase_uid=decoded["uid"], email=decoded.get("email", ""))
+
+
+def delete_firebase_user(firebase_uid: str) -> None:
+    """Remove the Firebase identity behind a deleted account.
+
+    Kept here beside the token verification rather than called from main, so
+    firebase_admin stays confined to this module — everything else talks to
+    Firebase only through these two functions.
+
+    Without this the rows are gone but the login survives: signing in again
+    would silently mint a brand-new empty account for an identity the user asked
+    to have erased.
+    """
+    firebase_auth.delete_user(firebase_uid)

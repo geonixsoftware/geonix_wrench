@@ -29,6 +29,14 @@ class NotOrgMemberError(Exception):
     pass
 
 
+class UserNotFoundError(Exception):
+    pass
+
+
+class OwnerMustDeleteOrgError(Exception):
+    """The account owns a shop that still has other members in it."""
+
+
 class OwnerCannotLeaveError(Exception):
     pass
 
@@ -310,6 +318,75 @@ def remove_org_member(org_id: int, user_id: int) -> None:
 
         conn.execute("UPDATE users SET org_id = NULL, org_role = NULL WHERE id = ?", (user_id,))
         conn.commit()
+
+
+def delete_user_account(user_id: int) -> Dict[str, Any]:
+    """Erase a user and everything of theirs, in one transaction.
+
+    GDPR calls this the right to erasure, and the App Store refuses a listing
+    with accounts but no way to close one. Both want the data actually gone
+    rather than flagged deleted, so this is a real DELETE.
+
+    Refuses when the user owns a shop that other people are still in: dropping
+    it would silently take away another mechanic's workplace and their access to
+    the job cards in it. The owner deletes or hands over the shop first, which
+    the Organization screen already supports. A shop with nobody but the owner
+    left in it is removed here, since there is no one for it to belong to.
+
+    Returns a summary of what was erased so the caller can log the shape of the
+    deletion without holding on to the contents.
+    """
+    with get_connection() as conn:
+        user = conn.execute(
+            "SELECT id, org_id, org_role FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if user is None:
+            raise UserNotFoundError(f"No user with id {user_id}")
+
+        org_id = user["org_id"]
+        if org_id is not None and user["org_role"] == "owner":
+            others = conn.execute(
+                "SELECT COUNT(*) AS c FROM users WHERE org_id = ? AND id != ?",
+                (org_id, user_id),
+            ).fetchone()["c"]
+            if others:
+                raise OwnerMustDeleteOrgError(
+                    "Remove the other members from your shop, or hand it over, "
+                    "before deleting your account"
+                )
+
+        # Job cards carry the transcript of what the mechanic said, so they are
+        # the most personal thing here. Personal-scope cards go unconditionally;
+        # org-scope cards go only with the shop, because they belong to the
+        # business rather than to whoever dictated them.
+        deleted_jobcards = conn.execute(
+            "DELETE FROM jobcards WHERE user_id = ? AND org_id IS NULL", (user_id,)
+        ).rowcount
+
+        conn.execute(
+            "DELETE FROM invites WHERE invited_user_id = ? OR invited_by_user_id = ?",
+            (user_id, user_id),
+        )
+        conn.execute(
+            "DELETE FROM subscriptions WHERE scope_type = 'user' AND scope_id = ?", (user_id,)
+        )
+
+        deleted_org = None
+        if org_id is not None and user["org_role"] == "owner":
+            deleted_org = org_id
+            deleted_jobcards += conn.execute(
+                "DELETE FROM jobcards WHERE org_id = ?", (org_id,)
+            ).rowcount
+            conn.execute("DELETE FROM invites WHERE org_id = ?", (org_id,))
+            conn.execute(
+                "DELETE FROM subscriptions WHERE scope_type = 'org' AND scope_id = ?", (org_id,)
+            )
+            conn.execute("DELETE FROM organizations WHERE id = ?", (org_id,))
+
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+
+    return {"jobcards": deleted_jobcards, "org_id": deleted_org}
 
 
 def _org_row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:

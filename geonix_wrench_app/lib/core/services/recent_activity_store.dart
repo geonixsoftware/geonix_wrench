@@ -43,12 +43,12 @@ class RecentActivityEntry {
   }
 
   Map<String, dynamic> toJson() => {
-        'jobcard_id': jobCardId,
-        'title': title,
-        'subtitle': subtitle,
-        'created_at': createdAt.toIso8601String(),
-        if (pdfPath != null) 'pdf_path': pdfPath,
-      };
+    'jobcard_id': jobCardId,
+    'title': title,
+    'subtitle': subtitle,
+    'created_at': createdAt.toIso8601String(),
+    if (pdfPath != null) 'pdf_path': pdfPath,
+  };
 
   static RecentActivityEntry? fromJson(Map<String, dynamic> json) {
     final id = json['jobcard_id'];
@@ -100,7 +100,10 @@ class RecentActivityStore extends ChangeNotifier {
         if (decoded is List) {
           _entries = decoded
               .whereType<Map>()
-              .map((item) => RecentActivityEntry.fromJson(item.cast<String, dynamic>()))
+              .map(
+                (item) =>
+                    RecentActivityEntry.fromJson(item.cast<String, dynamic>()),
+              )
               .whereType<RecentActivityEntry>()
               .take(_limit)
               .toList();
@@ -108,7 +111,11 @@ class RecentActivityStore extends ChangeNotifier {
       } catch (e, stackTrace) {
         // A corrupt or out-of-date blob must not stop the app from starting;
         // the worst case is an empty history.
-        AppLogger.warn('RecentActivityStore: could not read stored history', e, stackTrace);
+        AppLogger.warn(
+          'RecentActivityStore: could not read stored history',
+          e,
+          stackTrace,
+        );
       }
     }
 
@@ -119,7 +126,9 @@ class RecentActivityStore extends ChangeNotifier {
   Future<void> record(JobCard card, {required String fallbackTitle}) async {
     if (_limit == 0) return;
 
-    final title = card.vehicleInfo.trim().isNotEmpty ? card.vehicleInfo.trim() : fallbackTitle;
+    final title = card.vehicleInfo.trim().isNotEmpty
+        ? card.vehicleInfo.trim()
+        : fallbackTitle;
     final entry = RecentActivityEntry(
       jobCardId: card.id,
       title: title,

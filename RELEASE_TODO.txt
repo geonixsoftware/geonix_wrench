@@ -1,47 +1,62 @@
 Geonix Wrench - what still needs doing before release
-Written 2026-08-15. Updated the same day: everything that could be done
-without owner input has been done and moved to the DONE section at the
-bottom. What is left below genuinely needs credentials, accounts, money or a
-product decision.
+Written 2026-08-15. Revised 2026-08-17.
 
 Ordered by what blocks a release, not by effort. Items marked [BLOCKER] mean a
 paying customer would hit a broken or unsafe path on day one.
+
+Everything left in this file needs credentials, an account, money, or a
+force-push nobody should do on someone else's behalf. The code-side work is
+done — see DONE at the bottom.
 
 
 ================================================================================
 BLOCKERS
 ================================================================================
 
+[BLOCKER] A real user's data is public in git history
+    geonix_wrench_backend/geonix_wrench.db is untracked now, but the blob is
+    still in commits d9cdbc6 and aa83443 — and BOTH are ancestors of the pushed
+    branch on geonixsoftware/geonix_wrench, which is a PUBLIC repo. It holds one
+    users row: firebase_uid, email, handle.
+    The earlier note here reasoned this could wait because "this repo has no
+    remote to recover from". That stopped being true when the remote was added.
+    -> Purge it, from the repo root:
+         git bundle create ../backup.bundle --all      # do this first
+         FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force \
+           --index-filter 'git rm --cached --ignore-unmatch \
+             geonix_wrench_backend/geonix_wrench.db' \
+           --prune-empty --tag-name-filter cat -- --all
+         git reflog expire --expire=now --all && git gc --prune=now --aggressive
+         git push --force --all && git push --force --tags
+    -> Rewriting moves every commit SHA, so re-tag v1.0.0 afterwards.
+    -> GitHub keeps unreachable objects reachable by direct SHA URL. Ask GitHub
+       Support to purge the cached views, and treat that email as leaked
+       regardless.
+
 [BLOCKER] Rotate the three exposed credentials
     A live Stripe secret key (sk_live_), the Stripe webhook secret (whsec_)
     and an Anthropic key (sk-ant-api03-) were visible on screen on 2026-08-14.
     They are out of git now, but that does not revoke them. Rotation has never
     been confirmed. A live Stripe secret key can move money.
+    As of 2026-08-17 the key in .env still authenticates to live Stripe, which
+    says nothing either way about whether it is the original one.
     -> Rotate in the Stripe and Anthropic dashboards, then update .env.
     Detail: security.txt, finding 8.
 
 [BLOCKER] The backend is not deployed anywhere
-    There is no public API. Everything below that touches the server depends
-    on this being done first.
-    -> Deploy geonix_wrench_backend somewhere with HTTPS and a real hostname.
+    There is no public API. Everything that touches the server depends on this.
+    No longer blocked on tooling: Dockerfile, docker-compose.yml, Caddyfile,
+    .env.example, a systemd unit and DEPLOY.md are all in
+    geonix_wrench_backend/ now, and Caddy obtains the certificate itself.
+    -> Follow geonix_wrench_backend/DEPLOY.md. Needs a host and a DNS record.
 
 [BLOCKER] Release builds need an API host passed in
-    The dead default (https://api.geonixsoftware.com, which is NXDOMAIN) has
-    been removed. Release builds now have NO default and fail immediately at
-    startup with an explanatory error instead of dying on every request.
+    Release builds have NO default and fail immediately at startup with an
+    explanatory error instead of dying on every request.
     -> Build with: --dart-define=API_BASE_URL=https://your-real-api
     Still a blocker only because there is no host to point at yet.
-
-[BLOCKER] Stripe prices do not necessarily match what the site advertises
-    The site and app advertise EUR 29/month (Individual) and EUR 25/seat/month
-    (Team, minimum 2). Stripe charges whatever its price objects hold, which
-    is independent of those numbers.
-    -> Run: cd geonix_wrench_backend && ./venv/bin/python -m price_check
-       It compares both Stripe price objects against the advertised values and
-       exits non-zero on a mismatch. It needs the live STRIPE_API_KEY, so it
-       has never actually been run.
-    Stripe price amounts are immutable, so this most likely means creating new
-    prices and updating INDIVIDUAL_PRICE_ID / TEAM_PRICE_ID in config.py.
+    Debug builds no longer need this: Settings -> Development server sets the
+    address at runtime.
 
 [BLOCKER] Managed Payments opt-out is unverified against live Stripe
     Checkout previously failed with "this product tax code is ineligible for
@@ -69,12 +84,11 @@ All seven code-side findings from security.txt are fixed. What remains needs
 you:
 
 [OWNER]  Rotate the Stripe secret key, webhook secret and Anthropic key.
-[OWNER]  Purge geonix_wrench.db from git history before sharing the repo.
-         It is untracked and ignored now, but the blob is still in the two
-         existing commits. History rewriting is destructive and this repo has
-         no remote to recover from, so it was left for you.
+[OWNER]  Purge geonix_wrench.db from git history — now urgent, see BLOCKERS.
+         The repo is public and the blob is in the pushed history.
 [OWNER]  Set ALLOWED_ORIGINS in the deployed environment. Until it is set the
          API allows any origin but WITHOUT credentials, and warns at startup.
+         .env.example carries it as the first required value.
 
 
 ================================================================================
@@ -115,12 +129,7 @@ Seat downgrade requires manual member removal
     update_team_seats() refuses to drop below occupied seats, which is correct,
     but the owner has to go remove members elsewhere first. No guided flow.
 
-No account deletion
-    No way for a user to delete their account or data. Likely required for
-    App Store review and for GDPR, given the EUR pricing implies EU customers.
-
-No privacy policy or terms
-    Both stores require a privacy policy URL. Neither exists.
+(Account deletion and the legal pages moved to DONE on 2026-08-17.)
 
 Password reset emails land in spam
     Confirmed during testing. Firebase's default sender has poor deliverability.
@@ -187,3 +196,38 @@ Added 2026-08-15 (security + release work, no owner input needed):
 - GitHub Actions CI: backend pytest, Flutter analyze + test, and a secret
   scan over both tracked files and full history.
 - Test count: backend 52 -> 71, app 11.
+
+Added 2026-08-17:
+- Account deletion, end to end. DELETE /api/auth/me erases the user, their
+  personal job cards and transcripts, invites in both directions and the
+  subscription row; cancels the Stripe subscription first so a deleted customer
+  is never billed for an account they cannot reach; removes the Firebase
+  identity last, so a failure part-way is still retryable. Refuses when the
+  caller owns a shop other mechanics are still in, rather than destroying their
+  workplace. Settings -> Account -> Delete account, behind a confirmation.
+- Privacy policy and Terms of Service written and linked: geonix_website/
+  privacy.html and terms.html, in every page footer, and reachable from
+  Settings -> Legal in the app. Both stores need the privacy URL; GDPR needs
+  the content. THESE ARE DRAFTS — have a lawyer read them before you sell, and
+  fill in the company's country of establishment in Terms -> Governing law.
+- Self-hosting: Dockerfile (multi-stage, non-root, ffmpeg + libgomp1 for
+  faster-whisper), docker-compose.yml with Caddy terminating TLS, Caddyfile,
+  .env.example documenting all 35 environment variables, a hardened systemd
+  unit, and DEPLOY.md. GET /health added, unauthenticated, for probes.
+- price_check was BROKEN, not merely unrun: it called .get() on a StripeObject,
+  which does not implement it, and caught stripe.error.StripeError, an alias
+  removed in stripe-python 8. Both fixed, then run against live Stripe:
+  Individual 29.00 EUR and Team 25.00 EUR/seat both MATCH what is advertised.
+  That blocker is cleared.
+- API timeouts: every backend call was unbounded except the audio upload, so an
+  unreachable server left AuthGate spinning forever instead of reaching its own
+  "Can't reach Geonix Wrench" screen. All 14 call sites now share a 20s budget.
+- Debug-only runtime API host override (Settings -> Development server), so
+  testing on a real phone no longer needs a rebuild per address change.
+- iOS: UIFileSharingEnabled + LSSupportsOpeningDocumentsInPlace, so saved job
+  card PDFs are reachable in the Files app instead of invisible in the
+  container. NSAllowsLocalNetworking for LAN development.
+- Shop logos accept SVG (kept as vector into the PDF, screened for XXE,
+  scripts, event handlers and remote references) plus HEIC and the other common
+  raster formats.
+- Test count: backend 71 -> 150, app 11 -> 63.

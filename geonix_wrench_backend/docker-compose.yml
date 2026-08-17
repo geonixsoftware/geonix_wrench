@@ -1,0 +1,52 @@
+# Self-hosting Geonix Wrench on your own server.
+#
+#   cp .env.example .env         # then fill it in
+#   docker compose up -d --build
+#
+# Caddy sits in front and obtains a real Let's Encrypt certificate on its own.
+# That matters more than convenience: both mobile platforms refuse plain HTTP to
+# a public host, so an API without a valid certificate is an API the app cannot
+# talk to at all.
+
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Overridden here rather than trusted from .env: these have to match the
+      # volume mounts below, and a stale value in .env would put the database
+      # inside the container where it dies with it.
+      DB_PATH: /data/geonix_wrench.db
+      LOGO_STORAGE_DIR: /data/logos
+      HF_HOME: /data/models
+      FIREBASE_SERVICE_ACCOUNT_PATH: /run/secrets/firebase-service-account.json
+    volumes:
+      - wrench-data:/data
+      # Read-only: the app never writes its service account, and a container
+      # that cannot modify its own credentials is one less thing to worry about.
+      - ./firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+    # Not published to the host. Only Caddy reaches the API, so there is no way
+    # to accidentally serve it over plain HTTP on port 8000.
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here. Losing this volume means re-issuing them and
+      # running into Let's Encrypt's rate limits.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+
+volumes:
+  wrench-data:
+  caddy-data:
+  caddy-config:

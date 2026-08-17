@@ -35,16 +35,26 @@ class AudioUploadException implements Exception {
 class AudioUploadService {
   AudioUploadService({
     required this.authService,
-    this.endpoint = '$kApiBaseUrl/api/process-audio',
+    this.endpointOverride,
     this.timeout = const Duration(seconds: 180),
   });
 
   final AuthService authService;
-  final String endpoint;
+
+  /// Pins this service to one endpoint. Injected by tests; null in the app.
+  final String? endpointOverride;
+
   // CPU-based transcription with the medium Whisper model + an LLM
   // extraction call routinely take well over the old 15s/90s budgets,
   // especially on first run while the Whisper model is still loading.
   final Duration timeout;
+
+  /// Resolved per call, not frozen at construction: a debug server override can
+  /// change mid-session, and this service is built once when the record screen
+  /// first appears — it would otherwise keep uploading to the old address for
+  /// the rest of the session.
+  String get endpoint =>
+      endpointOverride ?? '${apiBaseUrl()}/api/process-audio';
 
   Future<JobCard> uploadRecording(String filePath) async {
     final uri = Uri.parse(endpoint);
@@ -76,17 +86,26 @@ class AudioUploadService {
       streamedResponse = await request.send().timeout(timeout);
     } on TimeoutException catch (e) {
       AppLogger.warn('AudioUploadService: request to $uri timed out', e);
-      throw AudioUploadException('Server took too long to respond', isTimeout: true);
+      throw AudioUploadException(
+        'Server took too long to respond',
+        isTimeout: true,
+      );
     } catch (e, stackTrace) {
-      AppLogger.error('AudioUploadService: request to $uri failed', e, stackTrace);
+      AppLogger.error(
+        'AudioUploadService: request to $uri failed',
+        e,
+        stackTrace,
+      );
       throw AudioUploadException('Could not reach the processing server');
     }
 
     final response = await http.Response.fromStream(streamedResponse);
     // NOTE: the response body is intentionally NOT logged — it can contain
     // transcript / customer data and would leak into system logs.
-    AppLogger.api('AudioUploadService: $uri -> ${response.statusCode} '
-        '(body ${response.bodyBytes.length} bytes)');
+    AppLogger.api(
+      'AudioUploadService: $uri -> ${response.statusCode} '
+      '(body ${response.bodyBytes.length} bytes)',
+    );
 
     // Server-side feature gate: a 402 means the backend rejected the request
     // because the subscription is not active. The client never decides this.

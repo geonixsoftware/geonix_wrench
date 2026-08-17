@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug override of src/main/res/xml/network_security_config.xml.
+
+     Resource merging replaces the main copy for debug builds only, so a
+     release APK still carries the app-wide cleartext lock exactly as written
+     there. Nothing in this file can reach a shipped build.
+
+     Why it is a blanket permit rather than a list of allowed addresses: this
+     config matches hosts, not CIDR blocks, so "private ranges only" is not
+     something it can express. Enumerating the addresses a dev machine happens
+     to have today would read as a precise rule while actually breaking the
+     next time DHCP or a phone hotspot hands out a different one. The real
+     boundary here is the debug/release split, and that one is absolute.
+
+     A phone cannot reach a backend on your laptop over loopback, so the dev
+     server is at a LAN address and talking to it means plain HTTP.
+
+     User trust anchors are included so a debugging proxy (Charles, mitmproxy)
+     can terminate TLS during development — also debug-only. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

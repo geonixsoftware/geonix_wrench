@@ -78,6 +78,32 @@ class AppStrings {
   static const String settingsRecentActivityDescription = 'settingsRecentActivityDescription';
   static const String settingsRecentActivityOff = 'settingsRecentActivityOff';
   static const String settingsRecentActivityCount = 'settingsRecentActivityCount';
+  static const String settingsDevServer = 'settingsDevServer';
+  static const String settingsDevServerDescription = 'settingsDevServerDescription';
+  static const String settingsDevServerLabel = 'settingsDevServerLabel';
+  static const String settingsDevServerHint = 'settingsDevServerHint';
+  static const String settingsDevServerSave = 'settingsDevServerSave';
+  static const String settingsDevServerReset = 'settingsDevServerReset';
+  static const String settingsDevServerInvalid = 'settingsDevServerInvalid';
+  static const String settingsDevServerSaved = 'settingsDevServerSaved';
+  static const String settingsDevServerInUse = 'settingsDevServerInUse';
+
+  static const String settingsLegal = 'settingsLegal';
+  static const String settingsPrivacy = 'settingsPrivacy';
+  static const String settingsPrivacyDescription = 'settingsPrivacyDescription';
+  static const String settingsTerms = 'settingsTerms';
+  static const String settingsTermsDescription = 'settingsTermsDescription';
+
+  static const String settingsAccount = 'settingsAccount';
+  static const String settingsSignOut = 'settingsSignOut';
+  static const String settingsSignOutDescription = 'settingsSignOutDescription';
+  static const String settingsDeleteAccount = 'settingsDeleteAccount';
+  static const String settingsDeleteAccountDescription = 'settingsDeleteAccountDescription';
+  static const String settingsDeleteAccountConfirmTitle = 'settingsDeleteAccountConfirmTitle';
+  static const String settingsDeleteAccountConfirmMessage = 'settingsDeleteAccountConfirmMessage';
+  static const String settingsDeleteAccountConfirmAction = 'settingsDeleteAccountConfirmAction';
+  static const String settingsDeleteAccountError = 'settingsDeleteAccountError';
+
   static const String settingsOrganization = 'settingsOrganization';
   static const String settingsOrganizationDescription = 'settingsOrganizationDescription';
   static const String settingsOrganizationManage = 'settingsOrganizationManage';

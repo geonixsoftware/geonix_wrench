@@ -1,0 +1,59 @@
+# Running the API directly on a host instead of in Docker.
+#
+#   sudo cp systemd/geonix-wrench.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now geonix-wrench
+#
+# Assumes the repo at /opt/geonix-wrench with a venv beside it, owned by a
+# service user that is not root:
+#   sudo useradd --system --home /opt/geonix-wrench wrench
+#   sudo -u wrench python3 -m venv /opt/geonix-wrench/venv
+#   sudo -u wrench /opt/geonix-wrench/venv/bin/pip install -r requirements.txt
+#
+# ffmpeg must be installed system-wide (apt install ffmpeg) — faster-whisper
+# shells out to it for every recording the app sends.
+#
+# This binds to localhost ONLY. Put a reverse proxy with a real certificate in
+# front of it; never expose uvicorn straight to the internet.
+
+[Unit]
+Description=Geonix Wrench API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=wrench
+Group=wrench
+WorkingDirectory=/opt/geonix-wrench/geonix_wrench_backend
+EnvironmentFile=/opt/geonix-wrench/geonix_wrench_backend/.env
+ExecStart=/opt/geonix-wrench/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
+
+Restart=always
+RestartSec=5
+
+# Loading the Whisper model on a cold cache takes minutes, and systemd would
+# otherwise give up and kill it part-way through the download.
+TimeoutStartSec=900
+
+# Hardening. The service needs to read its own directory and write its data
+# directory, and nothing else on the machine.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+ReadWritePaths=/var/lib/geonix-wrench
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geonix-wrench
+
+[Install]
+WantedBy=multi-user.target

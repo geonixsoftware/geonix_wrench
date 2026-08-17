@@ -17,22 +17,35 @@ class JobCardUpdateException implements Exception {
 }
 
 class JobCardUpdateService {
-  JobCardUpdateService({required this.authService, this.baseUrl = kApiBaseUrl});
+  JobCardUpdateService({required this.authService, this.baseUrlOverride});
 
   final AuthService authService;
-  final String baseUrl;
+
+  /// Pins this service to one address, overriding [apiBaseUrl]. Injected by
+  /// tests; left null in the app so the resolved value below is used.
+  final String? baseUrlOverride;
+
+  /// Resolved per call, not frozen at construction: a debug server override can
+  /// change mid-session, and a service built before that would otherwise keep
+  /// talking to the old address.
+  String get baseUrl => baseUrlOverride ?? apiBaseUrl();
 
   Future<void> update(JobCard card) async {
     final uri = Uri.parse('$baseUrl/api/jobcards/${card.id}');
     final http.Response response;
     try {
-      response = await http.patch(
-        uri,
-        headers: {'Content-Type': 'application/json', ...await authHeader(authService)},
-        body: jsonEncode({
-          'labor_rate': card.laborRate,
-          'parts_used': card.partsUsed.map((part) => part.toJson()).toList(),
-        }),
+      response = await withApiTimeout(
+        () async => http.patch(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            ...await authHeader(authService),
+          },
+          body: jsonEncode({
+            'labor_rate': card.laborRate,
+            'parts_used': card.partsUsed.map((part) => part.toJson()).toList(),
+          }),
+        ),
       );
     } catch (e) {
       throw JobCardUpdateException('Could not reach the processing server');

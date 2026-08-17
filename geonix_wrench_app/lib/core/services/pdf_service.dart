@@ -25,12 +25,20 @@ class PdfFetchException implements Exception {
 class PdfService {
   PdfService({
     required this.authService,
-    this.baseUrl = kApiBaseUrl,
+    this.baseUrlOverride,
     this.pdfDirectory,
   });
 
   final AuthService authService;
-  final String baseUrl;
+
+  /// Pins this service to one address, overriding [apiBaseUrl]. Injected by
+  /// tests; left null in the app so the resolved value below is used.
+  final String? baseUrlOverride;
+
+  /// Resolved per call, not frozen at construction: a debug server override can
+  /// change mid-session, and a service built before that would otherwise keep
+  /// talking to the old address.
+  String get baseUrl => baseUrlOverride ?? apiBaseUrl();
 
   /// Folder chosen in Settings, or null for the platform downloads folder.
   final String? pdfDirectory;
@@ -92,7 +100,11 @@ class PdfService {
         final downloads = await getDownloadsDirectory();
         return downloads == null ? const [] : [downloads];
       } catch (e, stackTrace) {
-        AppLogger.warn('PdfService: downloads folder unavailable', e, stackTrace);
+        AppLogger.warn(
+          'PdfService: downloads folder unavailable',
+          e,
+          stackTrace,
+        );
         return const [];
       }
     }
@@ -107,10 +119,18 @@ class PdfService {
         if (external != null) {
           // Created rather than probed: unlike the shared folders above, this
           // one belongs to the app and simply does not exist until asked for.
-          candidates.add(await Directory('${external.path}/Download').create(recursive: true));
+          candidates.add(
+            await Directory(
+              '${external.path}/Download',
+            ).create(recursive: true),
+          );
         }
       } catch (e, stackTrace) {
-        AppLogger.warn('PdfService: external storage unavailable', e, stackTrace);
+        AppLogger.warn(
+          'PdfService: external storage unavailable',
+          e,
+          stackTrace,
+        );
       }
       return candidates;
     }
@@ -141,7 +161,10 @@ class PdfService {
       if (profile != null && profile.isNotEmpty) return [Directory(profile)];
       final drive = environment['HOMEDRIVE'];
       final path = environment['HOMEPATH'];
-      if (drive != null && path != null && drive.isNotEmpty && path.isNotEmpty) {
+      if (drive != null &&
+          path != null &&
+          drive.isNotEmpty &&
+          path.isNotEmpty) {
         return [Directory('$drive$path')];
       }
       return const [];
@@ -177,13 +200,21 @@ class PdfService {
   /// The recent-activity list keeps only a job's id, so re-downloading from it
   /// cannot go through [generate] — and does not need to: the server renders
   /// the PDF from its own stored copy either way.
-  Future<File> download({required int jobCardId, required AppCurrency currency}) async {
+  Future<File> download({
+    required int jobCardId,
+    required AppCurrency currency,
+  }) async {
     final uri = Uri.parse('$baseUrl/api/jobcards/$jobCardId/pdf');
     final http.Response response;
     try {
-      response = await http.get(
-        uri,
-        headers: {'X-Currency': currency.code, ...await authHeader(authService)},
+      response = await withApiTimeout(
+        () async => http.get(
+          uri,
+          headers: {
+            'X-Currency': currency.code,
+            ...await authHeader(authService),
+          },
+        ),
       );
     } catch (e) {
       throw PdfFetchException('Could not reach the processing server');
@@ -214,7 +245,8 @@ class PdfService {
     // at-rest protection for the app's own retained history; the exported copy
     // is the deliverable, and it is cleartext by necessity.
     final directory = await resolveTargetDirectory(pdfDirectory);
-    final fileName = 'job_card_${jobCardId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final fileName =
+        'job_card_${jobCardId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File('${directory.path}/$fileName');
     await file.writeAsBytes(bytes);
 
@@ -225,15 +257,24 @@ class PdfService {
     try {
       final protectedBytes = await FileCipher.encryptBytes(bytes);
       final documents = await getApplicationDocumentsDirectory();
-      await File('${documents.path}/$fileName.enc').writeAsBytes(protectedBytes);
+      await File(
+        '${documents.path}/$fileName.enc',
+      ).writeAsBytes(protectedBytes);
     } catch (e, stackTrace) {
       // The exported PDF is what the user asked for and it is already on disk;
       // losing the archived copy must not fail the save.
-      AppLogger.warn('PdfService: could not write encrypted archive copy', e, stackTrace);
+      AppLogger.warn(
+        'PdfService: could not write encrypted archive copy',
+        e,
+        stackTrace,
+      );
     }
 
     try {
-      await Printing.sharePdf(bytes: bytes, filename: 'job_card_$jobCardId.pdf');
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'job_card_$jobCardId.pdf',
+      );
     } catch (_) {
       // Sharing is unavailable on this platform; the saved file is the result.
     }

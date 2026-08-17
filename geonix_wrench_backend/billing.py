@@ -433,6 +433,45 @@ def update_team_seats(*, user: dict, quantity: int) -> dict:
     return get_billing_status(user)
 
 
+def cancel_subscriptions_for_account(user: dict) -> list:
+    """Cancel whatever this account is paying for, immediately.
+
+    Called when an account is deleted. Without it the Stripe subscription
+    outlives the account it belonged to and the customer keeps being charged for
+    something they can no longer sign in to — the worst failure mode a paid
+    product has, and one they cannot fix themselves afterwards.
+
+    Best-effort by design: the deletion still goes through if Stripe is
+    unreachable, because someone exercising their right to erasure cannot be made
+    to wait on a third party. Returns the ids it cancelled so the caller can log
+    them. A subscription left behind is recoverable from the Stripe dashboard; a
+    refused deletion is not recoverable at all.
+    """
+    cancelled = []
+    scopes = [("user", user["id"])]
+    if user.get("org_id") is not None and user.get("org_role") == "owner":
+        scopes.append(("org", user["org_id"]))
+
+    for scope_type, scope_id in scopes:
+        record = database.get_subscription(scope_type, scope_id)
+        subscription_id = (record or {}).get("stripe_subscription_id")
+        if not subscription_id:
+            continue
+        try:
+            stripe.Subscription.delete(subscription_id)
+            cancelled.append(subscription_id)
+        except Exception:
+            logger.exception(
+                "Could not cancel subscription %s while deleting %s %s; "
+                "it must be cancelled by hand in Stripe",
+                subscription_id,
+                scope_type,
+                scope_id,
+            )
+
+    return cancelled
+
+
 def handle_webhook_event(payload: bytes, sig_header: Optional[str]) -> str:
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)

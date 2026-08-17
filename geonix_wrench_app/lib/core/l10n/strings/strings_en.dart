@@ -79,6 +79,37 @@ final Map<String, String> stringsEn = {
       'How many finished jobs the record screen keeps. Stored on this device only, never on the server.',
   AppStrings.settingsRecentActivityOff: 'Off — keep none',
   AppStrings.settingsRecentActivityCount: '{n} jobs',
+  AppStrings.settingsDevServer: 'Development server',
+  AppStrings.settingsDevServerDescription:
+      'Point this debug build at a different backend without rebuilding — a laptop on '
+          'your network, or a tunnel URL that works over mobile data. Debug builds only.',
+  AppStrings.settingsDevServerLabel: 'Server address',
+  AppStrings.settingsDevServerHint: 'https://example.trycloudflare.com',
+  AppStrings.settingsDevServerSave: 'Use this server',
+  AppStrings.settingsDevServerReset: 'Use built-in',
+  AppStrings.settingsDevServerInvalid: 'Enter a full http:// or https:// address',
+  AppStrings.settingsDevServerSaved: 'Now using {url}',
+  AppStrings.settingsDevServerInUse: 'In use',
+
+  AppStrings.settingsLegal: 'Legal',
+  AppStrings.settingsPrivacy: 'Privacy policy',
+  AppStrings.settingsPrivacyDescription: 'What we collect, why, and how to have it erased.',
+  AppStrings.settingsTerms: 'Terms of service',
+  AppStrings.settingsTermsDescription: 'Subscriptions, cancellation, and what the app promises.',
+
+  AppStrings.settingsAccount: 'Account',
+  AppStrings.settingsSignOut: 'Sign out',
+  AppStrings.settingsSignOutDescription: 'Leave this device signed out. Your data is kept.',
+  AppStrings.settingsDeleteAccount: 'Delete account',
+  AppStrings.settingsDeleteAccountDescription:
+      'Permanently erase your account, job cards and any active subscription.',
+  AppStrings.settingsDeleteAccountConfirmTitle: 'Delete your account?',
+  AppStrings.settingsDeleteAccountConfirmMessage:
+      'This erases your account, your job cards and their transcripts, and cancels any '
+          'active subscription. It cannot be undone. PDFs already saved to this device are kept.',
+  AppStrings.settingsDeleteAccountConfirmAction: 'Delete permanently',
+  AppStrings.settingsDeleteAccountError: 'Could not delete your account',
+
   AppStrings.settingsOrganization: 'Organization',
   AppStrings.settingsOrganizationDescription: 'Manage your shop, seats, and invites.',
   AppStrings.settingsOrganizationManage: 'Manage organization',

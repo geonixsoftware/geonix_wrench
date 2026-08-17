@@ -1,0 +1,42 @@
+# Replace api.example.com with the hostname whose DNS A record points at this
+# server. Caddy requests and renews the certificate for it automatically; that
+# is the whole reason it is here, since neither iOS nor Android will talk to a
+# public API without a valid one.
+#
+# For a first test without DNS, swap the hostname for :80 — but the app cannot
+# use that, because a release build refuses plain HTTP to a public host.
+
+api.example.com {
+	encode zstd gzip
+
+	# Recordings are the largest thing the app sends. The API caps upload size
+	# itself; this only has to be no smaller, or Caddy rejects the request
+	# before the API's own limit and error message ever apply.
+	request_body {
+		max_size 30MB
+	}
+
+	# Transcription plus extraction is a long request by design — the app allows
+	# 180s for it. The default proxy timeout would cut it off mid-job.
+	reverse_proxy api:8000 {
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		# The API serves JSON, PDFs and logos — never a page meant to be
+		# framed, scripted or navigated.
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

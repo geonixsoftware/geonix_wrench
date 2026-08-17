@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/app_config.dart';
+
 enum AppThemeMode { dark, light, system }
 
 enum AppLanguage {
@@ -143,11 +145,13 @@ class AppSettings extends ChangeNotifier {
   static const _languageKey = 'settings.language';
   static const _currencyKey = 'settings.currency';
   static const _pdfDirectoryKey = 'settings.pdf_directory';
+  static const _apiBaseUrlKey = 'settings.api_base_url';
 
   AppThemeMode _themeMode = AppThemeMode.system;
   AppLanguage _language = AppLanguage.english;
   AppCurrency _currency = AppCurrency.eur;
   String? _pdfDirectory;
+  String? _apiBaseUrlOverride;
   bool _loaded = false;
 
   AppThemeMode get themeMode => _themeMode;
@@ -159,6 +163,17 @@ class AppSettings extends ChangeNotifier {
   /// platform puts downloads" — resolved at save time rather than stored, so
   /// the default keeps working if the OS moves the folder.
   String? get pdfDirectory => _pdfDirectory;
+
+  /// Backend address typed into Settings, or null to use the compiled-in one.
+  ///
+  /// Read and honoured in debug builds only — see [apiBaseUrl]. It is still
+  /// stored and returned here in release builds so the value survives a switch
+  /// between build modes, but nothing acts on it there.
+  String? get apiBaseUrlOverride => _apiBaseUrlOverride;
+
+  /// The address actually in use, whatever its source. Shown in Settings so the
+  /// answer to "which server am I talking to" is never a guess.
+  String get effectiveApiBaseUrl => apiBaseUrl();
 
   ThemeMode get flutterThemeMode {
     switch (_themeMode) {
@@ -191,6 +206,12 @@ class AppSettings extends ChangeNotifier {
     }
     _pdfDirectory = prefs.getString(_pdfDirectoryKey);
 
+    // Pushed into app_config before anything can issue a request, so the first
+    // call of the session already goes to the chosen server rather than the
+    // compiled-in one.
+    _apiBaseUrlOverride = normalizeApiBaseUrl(prefs.getString(_apiBaseUrlKey));
+    setRuntimeApiBaseUrl(_apiBaseUrlOverride);
+
     _loaded = true;
     notifyListeners();
   }
@@ -214,6 +235,30 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_currencyKey, currency.code);
+  }
+
+  /// Points the app at a different backend. Pass `null` to go back to the
+  /// address compiled into the build.
+  ///
+  /// Returns false if the text is not a usable http/https address, so the
+  /// caller can say so rather than silently storing something unreachable.
+  Future<bool> setApiBaseUrlOverride(String? url) async {
+    final trimmed = url?.trim();
+    final normalized = normalizeApiBaseUrl(trimmed);
+    final clearing = trimmed == null || trimmed.isEmpty;
+    if (!clearing && normalized == null) return false;
+
+    _apiBaseUrlOverride = normalized;
+    setRuntimeApiBaseUrl(normalized);
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    if (normalized == null) {
+      await prefs.remove(_apiBaseUrlKey);
+    } else {
+      await prefs.setString(_apiBaseUrlKey, normalized);
+    }
+    return true;
   }
 
   /// Pass `null` to go back to the platform's downloads folder.

@@ -26,15 +26,25 @@ from config import (
 
 
 def _check(label: str, price_id: str, advertised: float) -> bool:
-    try:
-        price = stripe.Price.retrieve(price_id)
-    except stripe.error.StripeError as e:
-        print(f"  {label}: could not read {price_id} from Stripe — {e}")
+    if not price_id:
+        print(f"  !! {label}: no price id configured")
         return False
 
-    # Stripe stores minor units (cents).
-    actual = (price.get("unit_amount") or 0) / 100
-    currency = (price.get("currency") or "").upper()
+    try:
+        price = stripe.Price.retrieve(price_id)
+    # Not stripe.error.StripeError: that alias was removed in stripe-python 8,
+    # and naming it raised AttributeError *inside* the handler — turning a clean
+    # "could not read this price" into a crash.
+    except stripe.StripeError as e:
+        print(f"  !! {label}: could not read {price_id} from Stripe — {e}")
+        return False
+
+    # Subscript, not .get(): a StripeObject is dict-like but does not implement
+    # .get, and calling it raised AttributeError. That is why this script had
+    # never produced a result — it crashed on its own first comparison, which
+    # looked like "never run" rather than "broken".
+    actual = (price["unit_amount"] or 0) / 100
+    currency = (price["currency"] or "").upper()
 
     ok = abs(actual - advertised) < 0.005 and currency == BILLING_CURRENCY.upper()
     mark = "OK " if ok else "!! "

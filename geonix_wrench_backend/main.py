@@ -10,7 +10,13 @@ from fastapi.responses import FileResponse, Response
 
 import billing
 import database
-from auth import InvalidHandleError, get_current_user, init_firebase_app, validate_handle
+from auth import (
+    InvalidHandleError,
+    delete_firebase_user,
+    get_current_user,
+    init_firebase_app,
+    validate_handle,
+)
 from config import (
     ALLOWED_AUDIO_EXTENSIONS,
     ALLOWED_ORIGINS,
@@ -131,6 +137,21 @@ def on_startup() -> None:
     logger.info("Loading Whisper model...")
     preload_model()
     logger.info("Whisper model ready")
+
+
+@app.get("/health")
+def health() -> dict:
+    """Liveness probe for the container runtime and any reverse proxy.
+
+    Unauthenticated and deliberately dull: it says the process is up and serving,
+    nothing more. Every other route requires a Firebase token, so without this a
+    health check either has to mint a real credential or read 403 as "healthy" —
+    which would also read a broken auth config as healthy.
+
+    It reports no version, uptime or dependency state, because this endpoint is
+    reachable without credentials and none of that is anyone else's business.
+    """
+    return {"status": "ok"}
 
 
 def _user_to_profile(user: dict) -> UserProfile:
@@ -344,6 +365,58 @@ def remove_shop_logo(user: dict = Depends(get_current_user)) -> ShopLogoStatus:
 @app.get("/api/auth/me", response_model=UserProfile)
 def get_me(user: dict = Depends(get_current_user)) -> UserProfile:
     return _user_to_profile(user)
+
+
+@app.delete("/api/auth/me", status_code=204)
+def delete_me(user: dict = Depends(get_current_user)) -> Response:
+    """Close an account and erase its data.
+
+    Required rather than optional: GDPR gives an EU customer the right to
+    erasure, and the App Store will not list an app that creates accounts with
+    no way to close one. This app is priced in EUR and sold to European shops,
+    so both apply.
+
+    Order matters. Billing is cancelled first — if that were last, a failure
+    part-way through would leave a paying customer with no account and an
+    unstoppable charge. The Firebase identity goes last, because until it is gone
+    the caller's token still works and the request can still be retried.
+    """
+    cancelled = billing.cancel_subscriptions_for_account(user)
+
+    try:
+        summary = database.delete_user_account(user["id"])
+    except database.OwnerMustDeleteOrgError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from None
+    except database.UserNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+
+    # The stored logo is a file, not a row, so it needs removing separately.
+    try:
+        delete_shop_logo(resolve_owner_scope(user))
+    except Exception:
+        logger.exception("Could not delete shop logo for deleted user %s", user["id"])
+
+    # Last, and deliberately not fatal: the rows are already gone, so failing
+    # here would leave the caller unable to retry (their data is deleted) while
+    # reporting failure. It is logged loudly instead so the orphan can be cleared.
+    try:
+        delete_firebase_user(user["firebase_uid"])
+    except Exception:
+        logger.exception(
+            "Deleted user %s but could not remove their Firebase identity; "
+            "delete uid %s by hand",
+            user["id"],
+            user["firebase_uid"],
+        )
+
+    logger.info(
+        "Deleted account %s: %s job cards, org %s, cancelled subscriptions %s",
+        user["id"],
+        summary["jobcards"],
+        summary["org_id"],
+        cancelled or "none",
+    )
+    return Response(status_code=204)
 
 
 @app.post("/api/auth/handle", response_model=UserProfile)

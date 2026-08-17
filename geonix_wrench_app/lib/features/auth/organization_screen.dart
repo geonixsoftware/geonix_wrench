@@ -533,30 +533,56 @@ class _InviteTile extends StatelessWidget {
     final l10n = context.l10n;
     final theme = Theme.of(context);
 
+    final actions = busy ? const <Widget>[] : (trailing ?? const <Widget>[]);
+
+    // The actions sit on their own row rather than beside the text. Sharing one
+    // row, the buttons took their intrinsic width first and left the Expanded
+    // text column narrower than a single word, so "Invited by daniel" wrapped
+    // one fragment per line ("Invit / ed / by / dani / el") on a phone. Longer
+    // org names and the wordier locales made it worse, not better.
     return SurfaceWell(
       radius: AppTheme.radiusLg,
       padding: const EdgeInsets.all(AppTheme.space3),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const IconTile(Icons.mark_email_unread_outlined, size: 38),
-          const SizedBox(width: AppTheme.space3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(invite.orgName, style: theme.textTheme.titleSmall),
-                if (invite.invitedByHandle != null)
-                  Text(
-                    l10n.t(AppStrings.orgInvitedByLabel).replaceAll('{userName}', invite.invitedByHandle!),
-                    style: theme.textTheme.bodySmall?.copyWith(color: p.inkTertiary),
-                  ),
-              ],
-            ),
+          Row(
+            children: [
+              const IconTile(Icons.mark_email_unread_outlined, size: 38),
+              const SizedBox(width: AppTheme.space3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(invite.orgName, style: theme.textTheme.titleSmall),
+                    if (invite.invitedByHandle != null)
+                      Text(
+                        l10n.t(AppStrings.orgInvitedByLabel).replaceAll('{userName}', invite.invitedByHandle!),
+                        style: theme.textTheme.bodySmall?.copyWith(color: p.inkTertiary),
+                      ),
+                  ],
+                ),
+              ),
+              if (busy)
+                const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+            ],
           ),
-          if (busy)
-            const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-          else
-            ...?trailing,
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: AppTheme.space2),
+            // Wrap, not Row: two buttons in a locale with long labels still
+            // need somewhere to go. The full-width box is what makes
+            // WrapAlignment.end mean anything — a bare Wrap under a
+            // CrossAxisAlignment.start Column hugs its content and lands left.
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: AppTheme.space2,
+                runSpacing: AppTheme.space1,
+                children: actions,
+              ),
+            ),
+          ],
         ],
       ),
     );

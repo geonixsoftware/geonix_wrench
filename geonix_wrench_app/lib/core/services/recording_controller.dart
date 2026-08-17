@@ -38,7 +38,9 @@ class RecordingController extends ChangeNotifier {
   /// timer readout and the level meter rebuild — a plain notification here made
   /// the whole record screen (date formatting, recent-activity list and all)
   /// rebuild roughly twelve times a second, which is what made it stutter.
-  final ValueNotifier<Duration> elapsedListenable = ValueNotifier(Duration.zero);
+  final ValueNotifier<Duration> elapsedListenable = ValueNotifier(
+    Duration.zero,
+  );
   final ValueNotifier<double> amplitudeListenable = ValueNotifier(0);
 
   RecordingState get state => _state;
@@ -111,11 +113,13 @@ class RecordingController extends ChangeNotifier {
     _amplitudeSubscription = _recorder
         .onAmplitudeChanged(const Duration(milliseconds: 150))
         .listen((amplitude) {
-      const minDb = -45.0;
-      final normalized =
-          ((amplitude.current - minDb) / (0 - minDb)).clamp(0.0, 1.0);
-      amplitudeListenable.value = normalized;
-    });
+          const minDb = -45.0;
+          final normalized = ((amplitude.current - minDb) / (0 - minDb)).clamp(
+            0.0,
+            1.0,
+          );
+          amplitudeListenable.value = normalized;
+        });
   }
 
   Future<String?> stop() async {
@@ -248,7 +252,11 @@ Future<bool> mp4HasMoovAtom(File file) async {
     }
     return false;
   } catch (e, stackTrace) {
-    AppLogger.warn('mp4HasMoovAtom: could not inspect ${file.path}', e, stackTrace);
+    AppLogger.warn(
+      'mp4HasMoovAtom: could not inspect ${file.path}',
+      e,
+      stackTrace,
+    );
     return false;
   } finally {
     await handle?.close();
@@ -276,12 +284,17 @@ extension RecordingFileCleanup on RecordingController {
     try {
       final entities = tempDir.list();
       await for (final entity in entities) {
-        if (entity is File && entity.uri.pathSegments.last.startsWith('geonix_wrench_')) {
+        if (entity is File &&
+            entity.uri.pathSegments.last.startsWith('geonix_wrench_')) {
           await entity.delete();
         }
       }
     } catch (e, stackTrace) {
-      AppLogger.warn('RecordingController: failed to purge stale temp files', e, stackTrace);
+      AppLogger.warn(
+        'RecordingController: failed to purge stale temp files',
+        e,
+        stackTrace,
+      );
     }
   }
 }

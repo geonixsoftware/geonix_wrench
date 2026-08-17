@@ -16,10 +16,18 @@ class BillingException implements Exception {
 }
 
 class BillingService {
-  BillingService({required this.authService, this.baseUrl = kApiBaseUrl});
+  BillingService({required this.authService, this.baseUrlOverride});
 
   final AuthService authService;
-  final String baseUrl;
+
+  /// Pins this service to one address, overriding [apiBaseUrl]. Injected by
+  /// tests; left null in the app so the resolved value below is used.
+  final String? baseUrlOverride;
+
+  /// Resolved per call, not frozen at construction: a debug server override can
+  /// change mid-session, and a service built before that would otherwise keep
+  /// talking to the old address.
+  String get baseUrl => baseUrlOverride ?? apiBaseUrl();
 
   String _detailFrom(http.Response response) {
     try {
@@ -44,7 +52,9 @@ class BillingService {
     );
     http.Response response;
     try {
-      response = await http.get(uri, headers: await authHeader(authService));
+      response = await withApiTimeout(
+        () async => http.get(uri, headers: await authHeader(authService)),
+      );
     } catch (e) {
       throw BillingException('Could not reach the processing server');
     }
@@ -52,7 +62,9 @@ class BillingService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw BillingException(_detailFrom(response));
     }
-    return BillingStatus.fromJson((jsonDecode(response.body) as Map).cast<String, dynamic>());
+    return BillingStatus.fromJson(
+      (jsonDecode(response.body) as Map).cast<String, dynamic>(),
+    );
   }
 
   Future<String> createCheckoutSession({
@@ -64,15 +76,20 @@ class BillingService {
     final uri = Uri.parse('$baseUrl/api/billing/checkout-session');
     http.Response response;
     try {
-      response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json', ...await authHeader(authService)},
-        body: jsonEncode({
-          'plan': plan,
-          'quantity': ?quantity,
-          'success_url': successUrl,
-          'cancel_url': cancelUrl,
-        }),
+      response = await withApiTimeout(
+        () async => http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            ...await authHeader(authService),
+          },
+          body: jsonEncode({
+            'plan': plan,
+            'quantity': ?quantity,
+            'success_url': successUrl,
+            'cancel_url': cancelUrl,
+          }),
+        ),
       );
     } catch (e) {
       throw BillingException('Could not reach the processing server');
@@ -91,10 +108,15 @@ class BillingService {
     final uri = Uri.parse('$baseUrl/api/billing/portal-session');
     http.Response response;
     try {
-      response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json', ...await authHeader(authService)},
-        body: jsonEncode({'return_url': returnUrl}),
+      response = await withApiTimeout(
+        () async => http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            ...await authHeader(authService),
+          },
+          body: jsonEncode({'return_url': returnUrl}),
+        ),
       );
     } catch (e) {
       throw BillingException('Could not reach the processing server');
@@ -113,10 +135,15 @@ class BillingService {
     final uri = Uri.parse('$baseUrl/api/billing/seats');
     http.Response response;
     try {
-      response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json', ...await authHeader(authService)},
-        body: jsonEncode({'quantity': quantity}),
+      response = await withApiTimeout(
+        () async => http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            ...await authHeader(authService),
+          },
+          body: jsonEncode({'quantity': quantity}),
+        ),
       );
     } catch (e) {
       throw BillingException('Could not reach the processing server');
@@ -125,6 +152,8 @@ class BillingService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw BillingException(_detailFrom(response));
     }
-    return BillingStatus.fromJson((jsonDecode(response.body) as Map).cast<String, dynamic>());
+    return BillingStatus.fromJson(
+      (jsonDecode(response.body) as Map).cast<String, dynamic>(),
+    );
   }
 }

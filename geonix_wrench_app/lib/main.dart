@@ -16,14 +16,18 @@ import 'core/config/app_config.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Settings first: it carries the debug-only server override, and
+  // assertApiBaseUrlConfigured has to see it. Checking before the load would
+  // reject a debug build that has a perfectly good address stored, just not a
+  // compiled-in one.
+  final settings = AppSettings();
+  await settings.load();
+
   // Surface a missing backend host immediately, rather than letting every
   // request fail later with an opaque connection error.
   assertApiBaseUrlConfigured();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  final settings = AppSettings();
-  await settings.load();
 
   // Loaded up front for the same reason as settings: the record screen reads
   // it on its first frame, and this history lives only on this device.

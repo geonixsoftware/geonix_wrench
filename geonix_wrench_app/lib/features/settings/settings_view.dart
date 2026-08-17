@@ -6,15 +6,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/billing/billing_controller.dart';
 import '../../core/billing/billing_gate.dart';
+import '../../core/config/app_config.dart';
 import '../../core/l10n/app_localizations.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/services/recent_activity_store.dart';
 import '../../core/services/shop_logo_service.dart';
+import '../../core/services/user_profile_service.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/utils/secure_logger.dart';
 import '../../shared/widgets/app_header.dart';
@@ -117,6 +120,13 @@ class SettingsView extends StatelessWidget {
                 const _PdfFolderSection(),
                 const SizedBox(height: AppTheme.space4),
                 const _ShopLogoSection(),
+                // Debug builds only. kDebugMode is a compile-time constant, so
+                // this whole widget is tree-shaken out of a release build —
+                // there is no hidden setting for anyone to find.
+                if (kDebugMode) ...[
+                  const SizedBox(height: AppTheme.space4),
+                  const _DevServerSection(),
+                ],
                 const SizedBox(height: AppTheme.space8),
                 SectionHeading(title: l10n.t(AppStrings.settingsOrganization)),
                 const SizedBox(height: AppTheme.space4),
@@ -138,10 +148,166 @@ class SettingsView extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const BillingScreen()),
                   ),
                 ),
+                const SizedBox(height: AppTheme.space8),
+                SectionHeading(title: l10n.t(AppStrings.settingsLegal)),
+                const SizedBox(height: AppTheme.space4),
+                _NavRow(
+                  icon: Icons.privacy_tip_outlined,
+                  tone: TileTone.neutral,
+                  title: l10n.t(AppStrings.settingsPrivacy),
+                  subtitle: l10n.t(AppStrings.settingsPrivacyDescription),
+                  onTap: () => _openExternal(context, kPrivacyPolicyUrl),
+                ),
+                const SizedBox(height: AppTheme.space3),
+                _NavRow(
+                  icon: Icons.gavel_rounded,
+                  tone: TileTone.neutral,
+                  title: l10n.t(AppStrings.settingsTerms),
+                  subtitle: l10n.t(AppStrings.settingsTermsDescription),
+                  onTap: () => _openExternal(context, kTermsUrl),
+                ),
+                const SizedBox(height: AppTheme.space8),
+                SectionHeading(title: l10n.t(AppStrings.settingsAccount)),
+                const SizedBox(height: AppTheme.space4),
+                const _AccountSection(),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Which backend this build talks to, changeable without rebuilding.
+///
+/// Exists because the address is otherwise compiled in, and the two ways to
+/// reach a laptop from a phone both move: a LAN address changes with the
+/// network, and a free tunnel hands out a new URL every restart. Rebuilding and
+/// reinstalling for each of those is what made testing on a real device slow
+/// enough to avoid.
+///
+/// Debug builds only — see [apiBaseUrl]. A release build ignores the stored
+/// value entirely, so this cannot become a way to aim a shipped app at
+/// someone else's server.
+class _DevServerSection extends StatefulWidget {
+  const _DevServerSection();
+
+  @override
+  State<_DevServerSection> createState() => _DevServerSectionState();
+}
+
+class _DevServerSectionState extends State<_DevServerSection> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: context.read<AppSettings>().apiBaseUrlOverride ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final settings = context.read<AppSettings>();
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+
+    final accepted = await settings.setApiBaseUrlOverride(_controller.text);
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          accepted
+              ? l10n
+                    .t(AppStrings.settingsDevServerSaved)
+                    .replaceAll('{url}', settings.effectiveApiBaseUrl)
+              : l10n.t(AppStrings.settingsDevServerInvalid),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _reset() async {
+    final settings = context.read<AppSettings>();
+    await settings.setApiBaseUrlOverride(null);
+    if (mounted) _controller.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final p = context.palette;
+    final theme = Theme.of(context);
+    final settings = context.watch<AppSettings>();
+
+    return _SettingsSection(
+      icon: Icons.dns_outlined,
+      title: l10n.t(AppStrings.settingsDevServer),
+      description: l10n.t(AppStrings.settingsDevServerDescription),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // The resolved address, not the stored override: with the field empty
+          // this is the compiled-in default, and "which server am I actually
+          // talking to" should never need working out.
+          SurfaceWell(
+            child: Row(
+              children: [
+                ToneChip(
+                  label: l10n.t(AppStrings.settingsDevServerInUse),
+                  tone: settings.apiBaseUrlOverride == null
+                      ? ChipTone.neutral
+                      : ChipTone.accent,
+                ),
+                const SizedBox(width: AppTheme.space3),
+                Expanded(
+                  child: Text(
+                    settings.effectiveApiBaseUrl,
+                    style: theme.textTheme.bodySmall?.copyWith(color: p.inkSecondary),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppTheme.space4),
+          TextField(
+            controller: _controller,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            enableSuggestions: false,
+            decoration: InputDecoration(
+              labelText: l10n.t(AppStrings.settingsDevServerLabel),
+              hintText: l10n.t(AppStrings.settingsDevServerHint),
+            ),
+            onSubmitted: (_) => _save(),
+          ),
+          const SizedBox(height: AppTheme.space4),
+          Wrap(
+            spacing: AppTheme.space3,
+            runSpacing: AppTheme.space3,
+            children: [
+              _CompactButton(
+                icon: Icons.check_rounded,
+                label: l10n.t(AppStrings.settingsDevServerSave),
+                onPressed: _save,
+              ),
+              if (settings.apiBaseUrlOverride != null)
+                _CompactButton(
+                  label: l10n.t(AppStrings.settingsDevServerReset),
+                  onPressed: _reset,
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -303,6 +469,136 @@ class _PdfFolderSectionState extends State<_PdfFolderSection> {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Sign out, and close the account for good.
+///
+/// Account deletion is not a nicety here: GDPR gives an EU customer the right to
+/// erasure, and the App Store rejects an app that creates accounts with no way
+/// to close one. The product is priced in EUR for European shops, so both bind.
+///
+/// Sits beside sign-out on purpose — that is where a user looks for it, and
+/// putting the reversible action next to the irreversible one makes the
+/// difference between them legible.
+class _AccountSection extends StatefulWidget {
+  const _AccountSection();
+
+  @override
+  State<_AccountSection> createState() => _AccountSectionState();
+}
+
+class _AccountSectionState extends State<_AccountSection> {
+  bool _deleting = false;
+
+  Future<void> _confirmAndDelete() async {
+    final l10n = context.l10n;
+    final p = context.palette;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.t(AppStrings.settingsDeleteAccountConfirmTitle)),
+        content: Text(l10n.t(AppStrings.settingsDeleteAccountConfirmMessage)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.t(AppStrings.cancel)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: p.danger),
+            child: Text(l10n.t(AppStrings.settingsDeleteAccountConfirmAction)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final authService = context.read<AuthService>();
+    final recentActivity = context.read<RecentActivityStore>();
+    final service = UserProfileService(authService: authService);
+
+    setState(() => _deleting = true);
+    try {
+      await service.deleteAccount();
+
+      // The on-device history is the app's own copy of what was just erased on
+      // the server. Leaving it behind would mean a deleted account's job titles
+      // still listed on the record screen.
+      await recentActivity.clear();
+      await authService.signOut();
+      // No navigation: AuthGate is watching AuthService and swaps to the login
+      // screen the moment the sign-out lands.
+    } on UserProfileException catch (e) {
+      if (!mounted) return;
+      // The server's own wording, not a generic failure: a 409 here means the
+      // caller still owns a shop with other mechanics in it, and that is
+      // actionable only if it is said out loud.
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e, stackTrace) {
+      AppLogger.error('SettingsView: account deletion failed', e, stackTrace);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.t(AppStrings.settingsDeleteAccountError))),
+      );
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final p = context.palette;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _NavRow(
+          icon: Icons.logout_rounded,
+          title: l10n.t(AppStrings.settingsSignOut),
+          subtitle: l10n.t(AppStrings.settingsSignOutDescription),
+          onTap: () => context.read<AuthService>().signOut(),
+        ),
+        const SizedBox(height: AppTheme.space3),
+        _NavRow(
+          icon: Icons.person_remove_outlined,
+          tone: TileTone.neutral,
+          title: l10n.t(AppStrings.settingsDeleteAccount),
+          subtitle: l10n.t(AppStrings.settingsDeleteAccountDescription),
+          titleColor: p.danger,
+          trailing: _deleting
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : null,
+          onTap: _deleting ? null : _confirmAndDelete,
+        ),
+      ],
+    );
+  }
+}
+
+/// Opens a legal page in the browser rather than an in-app webview: these have
+/// to be readable, shareable and printable, and a webview gives up all three.
+Future<void> _openExternal(BuildContext context, String url) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final l10n = context.l10n;
+  try {
+    final launched = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched) throw Exception('launchUrl returned false');
+  } catch (e, stackTrace) {
+    AppLogger.warn('SettingsView: could not open $url', e, stackTrace);
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.t(AppStrings.billingLaunchError))),
     );
   }
 }
@@ -670,13 +966,25 @@ class _NavRow extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.tone = TileTone.secondary,
+    this.titleColor,
+    this.trailing,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+
+  /// Null disables the row — used while a destructive action is in flight, so a
+  /// second tap cannot start it twice.
+  final VoidCallback? onTap;
   final TileTone tone;
+
+  /// Marks a destructive row without turning the whole tile red.
+  final Color? titleColor;
+
+  /// Replaces the chevron — a spinner, for a row that acts instead of
+  /// navigating.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -694,7 +1002,10 @@ class _NavRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: theme.textTheme.titleSmall),
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(color: titleColor),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
@@ -706,7 +1017,7 @@ class _NavRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppTheme.space2),
-          Icon(Icons.chevron_right_rounded, color: p.inkTertiary),
+          trailing ?? Icon(Icons.chevron_right_rounded, color: p.inkTertiary),
         ],
       ),
     );

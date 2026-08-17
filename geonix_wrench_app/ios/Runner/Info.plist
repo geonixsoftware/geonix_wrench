@@ -36,6 +36,28 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<!-- App Transport Security: cleartext stays banned for the public internet.
+	     NSAllowsLocalNetworking is the narrow exception Apple provides for
+	     exactly this case — it permits HTTP only to unqualified hostnames,
+	     .local names, and the link-local and private IP ranges (10.0.0.0/8,
+	     172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16). A backend on your
+	     laptop lives at one of those; a real API never does.
+
+	     Deliberately not NSAllowsArbitraryLoads, which would permit cleartext
+	     to anything and requires a written justification at App Store review.
+	     This key needs none, because it cannot weaken a connection to a real
+	     server: release builds point at an HTTPS host, which this exception
+	     does not apply to at all. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<!-- iOS 14+ requires this before an app may talk to devices on the local
+	     network; without it the first request to a LAN address is dropped and
+	     the permission prompt never appears. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Geonix Wrench connects to a Geonix Wrench server on your local network.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Geonix Wrench needs microphone access to record job audio for processing.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

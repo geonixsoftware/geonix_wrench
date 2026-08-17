@@ -19,10 +19,18 @@ class UserProfileException implements Exception {
 }
 
 class UserProfileService {
-  UserProfileService({required this.authService, this.baseUrl = kApiBaseUrl});
+  UserProfileService({required this.authService, this.baseUrlOverride});
 
   final AuthService authService;
-  final String baseUrl;
+
+  /// Pins this service to one address, overriding [apiBaseUrl]. Injected by
+  /// tests; left null in the app so the resolved value below is used.
+  final String? baseUrlOverride;
+
+  /// Resolved per call, not frozen at construction: a debug server override can
+  /// change mid-session, and a service built before that would otherwise keep
+  /// talking to the old address.
+  String get baseUrl => baseUrlOverride ?? apiBaseUrl();
 
   String _detailFrom(http.Response response) {
     try {
@@ -37,7 +45,9 @@ class UserProfileService {
   Future<http.Response> _get(String path) async {
     final uri = Uri.parse('$baseUrl$path');
     try {
-      return await http.get(uri, headers: await authHeader(authService));
+      return await withApiTimeout(
+        () async => http.get(uri, headers: await authHeader(authService)),
+      );
     } catch (e) {
       throw UserProfileException('Could not reach the processing server');
     }
@@ -46,10 +56,15 @@ class UserProfileService {
   Future<http.Response> _post(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('$baseUrl$path');
     try {
-      return await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json', ...await authHeader(authService)},
-        body: jsonEncode(body),
+      return await withApiTimeout(
+        () async => http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            ...await authHeader(authService),
+          },
+          body: jsonEncode(body),
+        ),
       );
     } catch (e) {
       throw UserProfileException('Could not reach the processing server');
@@ -59,7 +74,9 @@ class UserProfileService {
   Future<http.Response> _delete(String path) async {
     final uri = Uri.parse('$baseUrl$path');
     try {
-      return await http.delete(uri, headers: await authHeader(authService));
+      return await withApiTimeout(
+        () async => http.delete(uri, headers: await authHeader(authService)),
+      );
     } catch (e) {
       throw UserProfileException('Could not reach the processing server');
     }
@@ -104,6 +121,19 @@ class UserProfileService {
     return Organization.fromJson(_decodeMap(response));
   }
 
+  /// Closes the account and erases its data on the server.
+  ///
+  /// Throws [UserProfileException] carrying the server's own wording on 409 —
+  /// which is what it returns when the caller still owns a shop with other
+  /// mechanics in it, and that reason has to reach the user rather than becoming
+  /// a generic failure.
+  Future<void> deleteAccount() async {
+    final response = await _delete('/api/auth/me');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw UserProfileException(_detailFrom(response));
+    }
+  }
+
   Future<void> deleteOrganization(int orgId) async {
     final response = await _delete('/api/organizations/$orgId');
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -124,7 +154,9 @@ class UserProfileService {
       throw UserProfileException(_detailFrom(response));
     }
     final decoded = jsonDecode(response.body) as List;
-    return decoded.map((item) => Member.fromJson((item as Map).cast<String, dynamic>())).toList();
+    return decoded
+        .map((item) => Member.fromJson((item as Map).cast<String, dynamic>()))
+        .toList();
   }
 
   Future<void> removeMember(int orgId, int userId) async {
@@ -135,7 +167,9 @@ class UserProfileService {
   }
 
   Future<Invite> createInvite(int orgId, String handle) async {
-    final response = await _post('/api/organizations/$orgId/invites', {'handle': handle});
+    final response = await _post('/api/organizations/$orgId/invites', {
+      'handle': handle,
+    });
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw UserProfileException(_detailFrom(response));
     }
@@ -148,11 +182,15 @@ class UserProfileService {
       throw UserProfileException(_detailFrom(response));
     }
     final decoded = jsonDecode(response.body) as List;
-    return decoded.map((item) => Invite.fromJson((item as Map).cast<String, dynamic>())).toList();
+    return decoded
+        .map((item) => Invite.fromJson((item as Map).cast<String, dynamic>()))
+        .toList();
   }
 
   Future<void> revokeInvite(int orgId, int inviteId) async {
-    final response = await _delete('/api/organizations/$orgId/invites/$inviteId');
+    final response = await _delete(
+      '/api/organizations/$orgId/invites/$inviteId',
+    );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw UserProfileException(_detailFrom(response));
     }
@@ -164,7 +202,9 @@ class UserProfileService {
       throw UserProfileException(_detailFrom(response));
     }
     final decoded = jsonDecode(response.body) as List;
-    return decoded.map((item) => Invite.fromJson((item as Map).cast<String, dynamic>())).toList();
+    return decoded
+        .map((item) => Invite.fromJson((item as Map).cast<String, dynamic>()))
+        .toList();
   }
 
   Future<UserProfile> acceptInvite(int inviteId) async {

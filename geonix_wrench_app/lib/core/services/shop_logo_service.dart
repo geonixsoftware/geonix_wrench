@@ -17,16 +17,26 @@ class ShopLogoException implements Exception {
 }
 
 class ShopLogoService {
-  ShopLogoService({required this.authService, this.baseUrl = kApiBaseUrl});
+  ShopLogoService({required this.authService, this.baseUrlOverride});
 
   final AuthService authService;
-  final String baseUrl;
+
+  /// Pins this service to one address, overriding [apiBaseUrl]. Injected by
+  /// tests; left null in the app so the resolved value below is used.
+  final String? baseUrlOverride;
+
+  /// Resolved per call, not frozen at construction: a debug server override can
+  /// change mid-session, and a service built before that would otherwise keep
+  /// talking to the old address.
+  String get baseUrl => baseUrlOverride ?? apiBaseUrl();
 
   Future<bool> fetchStatus() async {
     final uri = Uri.parse('$baseUrl/api/shop-logo/status');
     final http.Response response;
     try {
-      response = await http.get(uri, headers: await authHeader(authService));
+      response = await withApiTimeout(
+        () async => http.get(uri, headers: await authHeader(authService)),
+      );
     } catch (e) {
       throw ShopLogoException('Could not reach the processing server');
     }
@@ -41,7 +51,9 @@ class ShopLogoService {
     final uri = Uri.parse('$baseUrl/api/shop-logo');
     final http.Response response;
     try {
-      response = await http.get(uri, headers: await authHeader(authService));
+      response = await withApiTimeout(
+        () async => http.get(uri, headers: await authHeader(authService)),
+      );
     } catch (e) {
       throw ShopLogoException('Could not reach the processing server');
     }
@@ -55,11 +67,13 @@ class ShopLogoService {
     final uri = Uri.parse('$baseUrl/api/shop-logo');
     final request = http.MultipartRequest('POST', uri);
     request.headers.addAll(await authHeader(authService));
-    request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    request.files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: filename),
+    );
 
     final http.StreamedResponse streamedResponse;
     try {
-      streamedResponse = await request.send();
+      streamedResponse = await withApiTimeout(request.send);
     } catch (e) {
       throw ShopLogoException('Could not reach the processing server');
     }
@@ -82,7 +96,9 @@ class ShopLogoService {
     final uri = Uri.parse('$baseUrl/api/shop-logo');
     final http.Response response;
     try {
-      response = await http.delete(uri, headers: await authHeader(authService));
+      response = await withApiTimeout(
+        () async => http.delete(uri, headers: await authHeader(authService)),
+      );
     } catch (e) {
       throw ShopLogoException('Could not reach the processing server');
     }
