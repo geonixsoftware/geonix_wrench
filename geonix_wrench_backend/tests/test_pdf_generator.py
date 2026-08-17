@@ -77,6 +77,35 @@ def test_date_falls_back_to_the_raw_value_when_unparseable():
     assert pdf_generator._format_date(None) == ""
 
 
+def test_svg_logo_is_drawn_as_vector(tmp_path, monkeypatch):
+    svg = tmp_path / "org_1.svg"
+    svg.write_bytes(
+        b'<svg xmlns="http://www.w3.org/2000/svg" width="240" height="60">'
+        b'<rect width="240" height="60" fill="#1F3A5F"/></svg>'
+    )
+    monkeypatch.setattr(pdf_generator, "get_active_logo_path", lambda owner: str(svg))
+
+    header = pdf_generator._build_header_image(OwnerScope(org_id=1, user_id=1))
+    # A Drawing, not an Image: the logo goes into the PDF as vector geometry,
+    # so it is not capped at the 1000px a raster upload is stored at.
+    assert header.__class__.__name__ == "Drawing"
+    assert round(header.height, 2) == 36.0  # 0.5in, the header box
+
+    data = pdf_generator.generate_jobcard_pdf(_jobcard(), OwnerScope(org_id=1, user_id=1))
+    assert data.startswith(_PDF_MAGIC)
+
+
+def test_a_logo_that_stopped_parsing_does_not_kill_the_export(tmp_path, monkeypatch):
+    broken = tmp_path / "org_1.svg"
+    broken.write_bytes(b"<svg truncated")
+    monkeypatch.setattr(pdf_generator, "get_active_logo_path", lambda owner: str(broken))
+
+    # The job card is the deliverable; a bad logo costs the branding, not the
+    # document.
+    data = pdf_generator.generate_jobcard_pdf(_jobcard(), OwnerScope(org_id=1, user_id=1))
+    assert data.startswith(_PDF_MAGIC)
+
+
 def test_handles_a_jobcard_with_no_parts():
     data = pdf_generator.generate_jobcard_pdf(
         _jobcard(parts_used=[]), OwnerScope(org_id=None, user_id=1)

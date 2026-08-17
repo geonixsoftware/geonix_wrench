@@ -9,9 +9,11 @@ import '../../core/billing/billing_gate.dart';
 import '../../core/l10n/app_localizations.dart';
 import '../../core/utils/secure_logger.dart';
 import '../../core/l10n/app_strings.dart';
-import '../../core/models/job_card.dart';
 import '../../core/services/audio_upload_service.dart';
+import '../../core/services/pdf_service.dart';
+import '../../core/services/recent_activity_store.dart';
 import '../../core/services/recording_controller.dart';
+import '../../core/settings/app_settings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/app_header.dart';
 import '../../shared/widgets/block_layout.dart';
@@ -28,18 +30,6 @@ String _formatDuration(Duration duration) {
   return '$minutes:$seconds';
 }
 
-class _RecentActivityEntry {
-  _RecentActivityEntry({
-    required this.title,
-    required this.subtitle,
-    required this.time,
-  });
-
-  final String title;
-  final String subtitle;
-  final DateTime time;
-}
-
 class RecordView extends StatefulWidget {
   const RecordView({super.key});
 
@@ -52,10 +42,12 @@ class _RecordViewState extends State<RecordView> {
 
   final RecordingController _controller = RecordingController();
   late final AudioUploadService _uploadService;
-  final List<_RecentActivityEntry> _recentActivity = [];
 
   _UploadStage _stage = _UploadStage.none;
   String? _pendingFilePath;
+
+  /// The recent-activity row currently re-fetching its PDF, if any.
+  int? _downloadingJobCardId;
 
   /// Whether the current error is one retrying cannot fix. Drives whether the
   /// error screen offers a Retry button at all.
@@ -141,7 +133,11 @@ class _RecordViewState extends State<RecordView> {
       // this screen, since the user may never come back to the review view).
       await _controller.deleteRecording(path);
       if (!mounted) return;
-      _addRecentActivity(jobCard);
+      await context.read<RecentActivityStore>().record(
+            jobCard,
+            fallbackTitle: context.l10n.t(AppStrings.recordRecentActivityUntitled),
+          );
+      if (!mounted) return;
       await Navigator.of(context).push<void>(
         MaterialPageRoute(builder: (_) => JobCardReviewView(jobCard: jobCard)),
       );
@@ -197,23 +193,60 @@ class _RecordViewState extends State<RecordView> {
     }
   }
 
-  void _addRecentActivity(JobCard jobCard) {
-    final title = jobCard.vehicleInfo.trim().isNotEmpty
-        ? jobCard.vehicleInfo.trim()
-        : context.l10n.t(AppStrings.recordRecentActivityUntitled);
-    setState(() {
-      _recentActivity.insert(
-        0,
-        _RecentActivityEntry(
-          title: title,
-          subtitle: jobCard.workPerformed.trim(),
-          time: DateTime.now(),
+  /// Re-downloads a finished job's PDF from the recent-activity list.
+  ///
+  /// The list keeps no document itself — only the job's id — so this asks the
+  /// server to render it again, saves it to the configured folder and offers
+  /// the share sheet, exactly as the review screen's export button does.
+  Future<void> _downloadAgain(RecentActivityEntry entry) async {
+    if (_downloadingJobCardId != null) return;
+
+    if (!context.read<BillingController>().isActive) {
+      await showSubscriptionRequiredDialog(context);
+      return;
+    }
+
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final store = context.read<RecentActivityStore>();
+    final settings = context.read<AppSettings>();
+    final service = PdfService(
+      authService: context.read<AuthService>(),
+      pdfDirectory: settings.pdfDirectory,
+    );
+
+    setState(() => _downloadingJobCardId = entry.jobCardId);
+    try {
+      final saved = await service.download(
+        jobCardId: entry.jobCardId,
+        currency: settings.currency,
+      );
+      await store.attachPdf(entry.jobCardId, saved.path);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('${l10n.t(AppStrings.jobCardPdfSaved)} · ${saved.parent.path}'),
         ),
       );
-      if (_recentActivity.length > 5) {
-        _recentActivity.removeLast();
+    } on PdfFetchException catch (e) {
+      if (!mounted) return;
+      if (e.isPaymentRequired) {
+        await showSubscriptionRequiredDialog(context);
+      } else {
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.t(AppStrings.jobCardPdfError))),
+        );
       }
-    });
+    } catch (e, stackTrace) {
+      AppLogger.error('RecordView: failed to re-download job card PDF', e, stackTrace);
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.t(AppStrings.jobCardPdfError))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _downloadingJobCardId = null);
+    }
   }
 
   Future<void> _retry() async {
@@ -238,7 +271,15 @@ class _RecordViewState extends State<RecordView> {
     if (diff.inMinutes < 60) {
       return l10n.t(AppStrings.recordActivityMinutesAgo).replaceAll('{n}', '${diff.inMinutes}');
     }
-    return l10n.t(AppStrings.recordActivityHoursAgo).replaceAll('{n}', '${diff.inHours}');
+    // The list survives restarts now, so it holds entries older than a day —
+    // which "31h ago" reads badly for.
+    if (diff.inHours < 24) {
+      return l10n.t(AppStrings.recordActivityHoursAgo).replaceAll('{n}', '${diff.inHours}');
+    }
+    if (diff.inDays < 7) {
+      return l10n.t(AppStrings.recordActivityDaysAgo).replaceAll('{n}', '${diff.inDays}');
+    }
+    return DateFormat.yMMMd(l10n.locale.toString()).format(time);
   }
 
   @override
@@ -252,7 +293,6 @@ class _RecordViewState extends State<RecordView> {
 
     if (_stage == _UploadStage.uploading) {
       return _StatusView(
-        headline: l10n.t(AppStrings.recordProcessingTitle),
         icon: SizedBox(
           width: 34,
           height: 34,
@@ -268,7 +308,6 @@ class _RecordViewState extends State<RecordView> {
       // the request can never succeed, so the only honest option is to
       // discard. The subtitle says why, rather than implying a flaky network.
       return _StatusView(
-        headline: l10n.t(AppStrings.recordErrorTitle),
         icon: Icon(Icons.error_outline_rounded, color: theme.colorScheme.error, size: 34),
         title: l10n.t(AppStrings.recordErrorTitle),
         subtitle: l10n.t(_errorIsPermanent
@@ -301,7 +340,8 @@ class _RecordViewState extends State<RecordView> {
     final isRecording = _controller.isRecording;
 
     return BlockScaffold(
-      header: _RecordHeader(isRecording: isRecording),
+      headerPadding: BlockScaffold.compactHeaderPadding,
+      header: const _RecordHeader(),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(
           AppTheme.space5,
@@ -327,8 +367,9 @@ class _RecordViewState extends State<RecordView> {
                 ),
                 const SizedBox(height: AppTheme.space8),
                 _RecentActivitySection(
-                  entries: _recentActivity,
                   formatRelativeTime: _formatRelativeTime,
+                  onOpen: _downloadAgain,
+                  busyJobCardId: _downloadingJobCardId,
                 ),
               ],
             ),
@@ -339,52 +380,21 @@ class _RecordViewState extends State<RecordView> {
   }
 }
 
-/// The near-black block at the top of the record screen.
+/// The near-black block at the top of the record screen: wordmark, then the
+/// date beside it. Nothing else.
 ///
-/// Carries the brand, the date, the headline and the live/idle state. Moving
-/// all four up here is what lets the sheet below hold nothing but the control
-/// itself.
+/// It used to stack a 34px "Ready to record" headline and an Idle/Recording
+/// chip underneath, which made the block taller than the record control it was
+/// introducing — and said nothing the control below does not already say by
+/// being a big red button with a running timer on it.
 class _RecordHeader extends StatelessWidget {
-  const _RecordHeader({required this.isRecording});
-
-  final bool isRecording;
+  const _RecordHeader();
 
   @override
   Widget build(BuildContext context) {
-    final p = context.palette;
     final l10n = context.l10n;
-    final theme = Theme.of(context);
-
-    final statusColor = isRecording ? p.danger : p.success;
-    final statusLabel = isRecording
-        ? l10n.t(AppStrings.recordStatusRecording)
-        : l10n.t(AppStrings.recordStatusIdle);
-    final dateLabel = DateFormat.yMMMEd(l10n.locale.toString()).format(DateTime.now());
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const AppHeaderBar(),
-        const SizedBox(height: AppTheme.space8),
-        Eyebrow(dateLabel, color: p.onBlockMuted),
-        const SizedBox(height: AppTheme.space3),
-        Text(
-          isRecording
-              ? l10n.t(AppStrings.recordingTitle)
-              : l10n.t(AppStrings.recordIdleTitle),
-          style: theme.textTheme.displaySmall?.copyWith(color: p.onBlock),
-        ),
-        const SizedBox(height: AppTheme.space4),
-        Row(
-          children: [
-            ToneChip(
-              label: statusLabel,
-              dotColor: statusColor,
-              tone: ChipTone.onBlock,
-            ),
-          ],
-        ),
-      ],
+    return AppHeaderBar(
+      label: DateFormat.yMMMEd(l10n.locale.toString()).format(DateTime.now()),
     );
   }
 }
@@ -466,18 +476,22 @@ class _RecordingActionCard extends StatelessWidget {
 
 class _RecentActivitySection extends StatelessWidget {
   const _RecentActivitySection({
-    required this.entries,
     required this.formatRelativeTime,
+    required this.onOpen,
+    required this.busyJobCardId,
   });
 
-  final List<_RecentActivityEntry> entries;
   final String Function(DateTime) formatRelativeTime;
+  final ValueChanged<RecentActivityEntry> onOpen;
+  final int? busyJobCardId;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final store = context.watch<RecentActivityStore>();
+    final entries = store.entries;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -488,6 +502,13 @@ class _RecentActivitySection extends StatelessWidget {
               ? null
               : ToneChip(label: '${entries.length}', tone: ChipTone.neutral),
         ),
+        if (entries.isNotEmpty) ...[
+          const SizedBox(height: AppTheme.space2),
+          Text(
+            l10n.t(AppStrings.recordRecentActivityHint),
+            style: theme.textTheme.bodySmall?.copyWith(color: p.inkTertiary),
+          ),
+        ],
         const SizedBox(height: AppTheme.space4),
         if (entries.isEmpty)
           // An empty state on its own dashed-feeling well, rather than a grey
@@ -500,10 +521,15 @@ class _RecentActivitySection extends StatelessWidget {
             ),
             child: Column(
               children: [
-                IconTile(Icons.description_outlined, tone: TileTone.neutral),
+                IconTile(
+                  store.limit == 0 ? Icons.history_toggle_off_rounded : Icons.description_outlined,
+                  tone: TileTone.neutral,
+                ),
                 const SizedBox(height: AppTheme.space4),
                 Text(
-                  l10n.t(AppStrings.recordRecentActivityEmpty),
+                  l10n.t(store.limit == 0
+                      ? AppStrings.recordRecentActivityOff
+                      : AppStrings.recordRecentActivityEmpty),
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(color: p.inkTertiary),
                 ),
@@ -512,7 +538,12 @@ class _RecentActivitySection extends StatelessWidget {
           )
         else
           for (final entry in entries) ...[
-            _RecentActivityTile(entry: entry, timeLabel: formatRelativeTime(entry.time)),
+            _RecentActivityTile(
+              entry: entry,
+              timeLabel: formatRelativeTime(entry.createdAt),
+              busy: entry.jobCardId == busyJobCardId,
+              onTap: busyJobCardId == null ? () => onOpen(entry) : null,
+            ),
             if (entry != entries.last) const SizedBox(height: AppTheme.space3),
           ],
       ],
@@ -521,10 +552,17 @@ class _RecentActivitySection extends StatelessWidget {
 }
 
 class _RecentActivityTile extends StatelessWidget {
-  const _RecentActivityTile({required this.entry, required this.timeLabel});
+  const _RecentActivityTile({
+    required this.entry,
+    required this.timeLabel,
+    required this.busy,
+    required this.onTap,
+  });
 
-  final _RecentActivityEntry entry;
+  final RecentActivityEntry entry;
   final String timeLabel;
+  final bool busy;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -534,6 +572,7 @@ class _RecentActivityTile extends StatelessWidget {
     return SurfaceCard(
       radius: AppTheme.radiusLg,
       padding: const EdgeInsets.all(AppTheme.space4),
+      onTap: onTap,
       child: Row(
         children: [
           const IconTile(Icons.description_outlined, size: 42),
@@ -561,9 +600,24 @@ class _RecentActivityTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppTheme.space3),
-          Text(
-            timeLabel,
-            style: theme.textTheme.bodySmall?.copyWith(color: p.inkTertiary),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                timeLabel,
+                style: theme.textTheme.bodySmall?.copyWith(color: p.inkTertiary),
+              ),
+              const SizedBox(height: 4),
+              // The affordance for "this row does something": a download glyph
+              // that becomes the spinner for the fetch it starts.
+              SizedBox(
+                height: 18,
+                width: 18,
+                child: busy
+                    ? CircularProgressIndicator(strokeWidth: 2, color: p.accent)
+                    : Icon(Icons.download_rounded, size: 18, color: p.accent),
+              ),
+            ],
           ),
         ],
       ),
@@ -575,14 +629,12 @@ class _RecentActivityTile extends StatelessWidget {
 /// screen so the layout never jumps between them.
 class _StatusView extends StatelessWidget {
   const _StatusView({
-    required this.headline,
     required this.icon,
     required this.title,
     required this.subtitle,
     this.action,
   });
 
-  final String headline;
   final Widget icon;
   final String title;
   final String subtitle;
@@ -594,17 +646,10 @@ class _StatusView extends StatelessWidget {
     final theme = Theme.of(context);
 
     return BlockScaffold(
-      header: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const AppHeaderBar(),
-          const SizedBox(height: AppTheme.space8),
-          Text(
-            headline,
-            style: theme.textTheme.displaySmall?.copyWith(color: p.onBlock),
-          ),
-        ],
-      ),
+      // Same block as the idle screen, so switching into processing or error
+      // does not shunt the whole layout up and down.
+      headerPadding: BlockScaffold.compactHeaderPadding,
+      header: const _RecordHeader(),
       child: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(

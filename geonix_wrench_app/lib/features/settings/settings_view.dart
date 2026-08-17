@@ -1,7 +1,9 @@
-import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -11,6 +13,7 @@ import '../../core/billing/billing_gate.dart';
 import '../../core/l10n/app_localizations.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/services/pdf_service.dart';
+import '../../core/services/recent_activity_store.dart';
 import '../../core/services/shop_logo_service.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/utils/secure_logger.dart';
@@ -26,23 +29,15 @@ class SettingsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.palette;
     final l10n = context.l10n;
-    final theme = Theme.of(context);
     final settings = context.watch<AppSettings>();
 
     return BlockScaffold(
-      header: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const AppHeaderBar(),
-          const SizedBox(height: AppTheme.space8),
-          Text(
-            l10n.t(AppStrings.navSettings),
-            style: theme.textTheme.displaySmall?.copyWith(color: p.onBlock),
-          ),
-        ],
-      ),
+      // The screen name rides beside the wordmark rather than under it as a
+      // 34px headline: this block was two-thirds empty near-black before the
+      // first setting appeared.
+      headerPadding: BlockScaffold.compactHeaderPadding,
+      header: AppHeaderBar(label: l10n.t(AppStrings.navSettings)),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(
           AppTheme.space5,
@@ -117,6 +112,8 @@ class SettingsView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppTheme.space4),
+                const _RecentActivitySection(),
+                const SizedBox(height: AppTheme.space4),
                 const _PdfFolderSection(),
                 const SizedBox(height: AppTheme.space4),
                 const _ShopLogoSection(),
@@ -150,6 +147,49 @@ class SettingsView extends StatelessWidget {
   }
 }
 
+/// How many finished jobs the record screen remembers.
+///
+/// The list is kept in the app's own preferences on this phone, so the ceiling
+/// is a retention choice, not a display one: lowering it forgets the entries it
+/// drops, and 0 means the app keeps no job history at all.
+class _RecentActivitySection extends StatelessWidget {
+  const _RecentActivitySection();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final store = context.watch<RecentActivityStore>();
+
+    return _SettingsSection(
+      icon: Icons.history_rounded,
+      title: l10n.t(AppStrings.settingsRecentActivity),
+      description: l10n.t(AppStrings.settingsRecentActivityDescription),
+      child: DropdownButtonFormField<int>(
+        initialValue: store.limit,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        items: [
+          for (var count = RecentActivityStore.minLimit;
+              count <= RecentActivityStore.maxLimit;
+              count++)
+            DropdownMenuItem(
+              value: count,
+              child: Text(
+                count == 0
+                    ? l10n.t(AppStrings.settingsRecentActivityOff)
+                    : l10n
+                        .t(AppStrings.settingsRecentActivityCount)
+                        .replaceAll('{n}', '$count'),
+              ),
+            ),
+        ],
+        onChanged: (count) {
+          if (count != null) store.setLimit(count);
+        },
+      ),
+    );
+  }
+}
+
 /// Where generated job-card PDFs are written.
 ///
 /// The resolved default is shown rather than the word "default", because
@@ -172,6 +212,8 @@ class _PdfFolderSectionState extends State<_PdfFolderSection> {
   }
 
   Future<void> _loadDefault() async {
+    // Nothing on iOS reads this, and resolving it costs a write probe.
+    if (_isIos) return;
     final directory = await PdfService.resolveTargetDirectory(null);
     if (mounted) setState(() => _resolvedDefault = directory.path);
   }
@@ -193,6 +235,12 @@ class _PdfFolderSectionState extends State<_PdfFolderSection> {
     }
   }
 
+  /// iOS gives an app no shared storage and no directory picker, so the folder
+  /// is neither choosable nor worth printing: the container path it resolves to
+  /// carries a UUID that changes on every app update. The route to the files is
+  /// the Files app, so that is what the setting names.
+  bool get _isIos => !kIsWeb && Platform.isIOS;
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -201,21 +249,31 @@ class _PdfFolderSectionState extends State<_PdfFolderSection> {
     final settings = context.watch<AppSettings>();
     final chosen = settings.pdfDirectory;
 
+    final location = _isIos
+        ? l10n.t(AppStrings.settingsPdfFolderIosLocation)
+        : (chosen ?? _resolvedDefault ?? '…');
+
     return _SettingsSection(
       icon: Icons.folder_outlined,
       title: l10n.t(AppStrings.settingsPdfFolder),
-      description: l10n.t(AppStrings.settingsPdfFolderDescription),
+      description: _isIos
+          ? l10n.t(AppStrings.settingsPdfFolderIosNote)
+          : l10n.t(AppStrings.settingsPdfFolderDescription),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SurfaceWell(
             child: Row(
               children: [
-                Icon(Icons.subdirectory_arrow_right_rounded, size: 17, color: p.inkTertiary),
+                Icon(
+                  _isIos ? Icons.folder_special_outlined : Icons.subdirectory_arrow_right_rounded,
+                  size: 17,
+                  color: p.inkTertiary,
+                ),
                 const SizedBox(width: AppTheme.space2),
                 Expanded(
                   child: Text(
-                    chosen ?? _resolvedDefault ?? '…',
+                    location,
                     style: theme.textTheme.bodySmall?.copyWith(color: p.inkSecondary),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -224,28 +282,32 @@ class _PdfFolderSectionState extends State<_PdfFolderSection> {
               ],
             ),
           ),
-          const SizedBox(height: AppTheme.space4),
-          Wrap(
-            spacing: AppTheme.space3,
-            runSpacing: AppTheme.space3,
-            children: [
-              _CompactButton(
-                icon: Icons.folder_open_outlined,
-                label: l10n.t(AppStrings.settingsPdfFolderChoose),
-                onPressed: _choose,
-              ),
-              if (chosen != null)
+          if (!_isIos) ...[
+            const SizedBox(height: AppTheme.space4),
+            Wrap(
+              spacing: AppTheme.space3,
+              runSpacing: AppTheme.space3,
+              children: [
                 _CompactButton(
-                  label: l10n.t(AppStrings.settingsPdfFolderReset),
-                  onPressed: () => settings.setPdfDirectory(null),
+                  icon: Icons.folder_open_outlined,
+                  label: l10n.t(AppStrings.settingsPdfFolderChoose),
+                  onPressed: _choose,
                 ),
-            ],
-          ),
+                if (chosen != null)
+                  _CompactButton(
+                    label: l10n.t(AppStrings.settingsPdfFolderReset),
+                    onPressed: () => settings.setPdfDirectory(null),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 }
+
+enum _LogoSource { photos, files }
 
 class _ShopLogoSection extends StatefulWidget {
   const _ShopLogoSection();
@@ -284,22 +346,58 @@ class _ShopLogoSectionState extends State<_ShopLogoSection> {
     }
   }
 
+  /// Logo formats the backend accepts.
+  ///
+  /// SVG is first because it is what a shop's designer actually hands over —
+  /// the previous gallery-only picker could not even see one, since a vector
+  /// file never lands in the phone's photo library.
+  static const _acceptedExtensions = <String>[
+    'svg',
+    'png',
+    'jpg',
+    'jpeg',
+    'webp',
+    'gif',
+    'bmp',
+    'tif',
+    'tiff',
+    'heic',
+    'heif',
+  ];
+
   Future<void> _pickAndUpload() async {
     if (!context.read<BillingController>().isActive) {
       await showSubscriptionRequiredDialog(context);
       return;
     }
 
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked == null) return;
+    // On a phone the two sources are genuinely different places — a photo of a
+    // sign lives in Photos, an SVG or a PNG from the designer lives in Files —
+    // and neither picker can reach the other. On desktop there is only one.
+    final useSourceSheet = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+    final source = useSourceSheet ? await _askSource() : _LogoSource.files;
+    if (source == null || !mounted) return;
+
+    final ({Uint8List bytes, String name})? picked = switch (source) {
+      _LogoSource.photos => await _pickFromPhotos(),
+      _LogoSource.files => await _pickFromFiles(),
+    };
+    if (picked == null || !mounted) return;
+
+    final extension = picked.name.split('.').last.toLowerCase();
+    if (!_acceptedExtensions.contains(extension)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.t(AppStrings.settingsShopLogoUnsupported))),
+      );
+      return;
+    }
 
     setState(() => _busy = true);
     try {
-      final bytes = await picked.readAsBytes();
-      await _service.uploadLogo(bytes, picked.name);
+      await _service.uploadLogo(picked.bytes, picked.name);
       await _load();
-    } catch (_) {
+    } catch (e, stackTrace) {
+      AppLogger.warn('SettingsView: shop logo upload failed', e, stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.l10n.t(AppStrings.settingsShopLogoUploadError))),
@@ -307,6 +405,78 @@ class _ShopLogoSectionState extends State<_ShopLogoSection> {
       }
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<_LogoSource?> _askSource() {
+    final l10n = context.l10n;
+    return showModalBottomSheet<_LogoSource>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.space5,
+                AppTheme.space5,
+                AppTheme.space5,
+                AppTheme.space2,
+              ),
+              child: SectionHeading(title: l10n.t(AppStrings.settingsShopLogoSourceTitle)),
+            ),
+            ListTile(
+              leading: const IconTile(Icons.photo_library_outlined, size: 40),
+              title: Text(l10n.t(AppStrings.settingsShopLogoSourcePhotos)),
+              onTap: () => Navigator.of(sheetContext).pop(_LogoSource.photos),
+            ),
+            ListTile(
+              leading: const IconTile(Icons.folder_open_outlined, size: 40),
+              title: Text(l10n.t(AppStrings.settingsShopLogoSourceFiles)),
+              subtitle: Text(l10n.t(AppStrings.settingsShopLogoFormats)),
+              onTap: () => Navigator.of(sheetContext).pop(_LogoSource.files),
+            ),
+            const SizedBox(height: AppTheme.space4),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<({Uint8List bytes, String name})?> _pickFromPhotos() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked == null) return null;
+    return (bytes: await picked.readAsBytes(), name: picked.name);
+  }
+
+  Future<({Uint8List bytes, String name})?> _pickFromFiles() async {
+    // Both a MIME list and an extension list: Android's picker filters on MIME
+    // and would otherwise grey out every SVG, while macOS and Windows filter on
+    // extension and ignore MIME entirely.
+    const group = XTypeGroup(
+      label: 'Images',
+      extensions: _acceptedExtensions,
+      mimeTypes: [
+        'image/svg+xml',
+        'image/png',
+        'image/jpeg',
+        'image/webp',
+        'image/gif',
+        'image/bmp',
+        'image/tiff',
+        'image/heic',
+        'image/heif',
+      ],
+      uniformTypeIdentifiers: ['public.image', 'public.svg-image'],
+    );
+
+    try {
+      final file = await openFile(acceptedTypeGroups: const [group]);
+      if (file == null) return null;
+      return (bytes: await file.readAsBytes(), name: file.name);
+    } catch (e, stackTrace) {
+      AppLogger.warn('SettingsView: file picker failed', e, stackTrace);
+      return null;
     }
   }
 
@@ -340,7 +510,8 @@ class _ShopLogoSectionState extends State<_ShopLogoSection> {
     return _SettingsSection(
       icon: Icons.image_outlined,
       title: l10n.t(AppStrings.settingsShopLogo),
-      description: l10n.t(AppStrings.settingsShopLogoDescription),
+      description: '${l10n.t(AppStrings.settingsShopLogoDescription)} '
+          '${l10n.t(AppStrings.settingsShopLogoFormats)}',
       child: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
           : Column(
@@ -360,14 +531,7 @@ class _ShopLogoSectionState extends State<_ShopLogoSection> {
                     borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                   ),
                   child: _logoBytes != null
-                      ? Image.memory(
-                          _logoBytes!,
-                          fit: BoxFit.contain,
-                          height: 60,
-                          // A corrupt or non-image response must not take the
-                          // whole settings screen down with an exception.
-                          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-                        )
+                      ? _LogoPreview(bytes: _logoBytes!)
                       : Text(
                           l10n.t(AppStrings.settingsShopLogoDefaultLabel),
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -406,6 +570,44 @@ class _ShopLogoSectionState extends State<_ShopLogoSection> {
                 ),
               ],
             ),
+    );
+  }
+}
+
+/// The stored shop logo, whichever of the two shapes it comes back as.
+///
+/// The server keeps an SVG upload as SVG rather than flattening it, so this
+/// endpoint can return either vector or raster. The bytes are sniffed instead
+/// of trusting a content type, so a proxy that rewrites headers cannot turn the
+/// preview into a broken image.
+class _LogoPreview extends StatelessWidget {
+  const _LogoPreview({required this.bytes});
+
+  final Uint8List bytes;
+
+  bool get _isSvg {
+    final head = String.fromCharCodes(bytes.take(256)).trimLeft();
+    return head.startsWith('<svg') || (head.startsWith('<?xml') && head.contains('<svg'));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isSvg) {
+      return SvgPicture.memory(
+        bytes,
+        fit: BoxFit.contain,
+        height: 60,
+        placeholderBuilder: (_) => const SizedBox.shrink(),
+      );
+    }
+
+    return Image.memory(
+      bytes,
+      fit: BoxFit.contain,
+      height: 60,
+      // A corrupt or non-image response must not take the whole settings
+      // screen down with an exception.
+      errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
     );
   }
 }

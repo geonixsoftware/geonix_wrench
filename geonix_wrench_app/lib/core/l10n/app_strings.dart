@@ -6,9 +6,7 @@ class AppStrings {
   static const String navSettings = 'navSettings';
   static const String splashTagline = 'splashTagline';
 
-  static const String recordIdleTitle = 'recordIdleTitle';
   static const String recordIdleSubtitle = 'recordIdleSubtitle';
-  static const String recordingTitle = 'recordingTitle';
   static const String recordingSubtitle = 'recordingSubtitle';
   static const String recordProcessingTitle = 'recordProcessingTitle';
   static const String recordProcessingSubtitle = 'recordProcessingSubtitle';
@@ -20,14 +18,15 @@ class AppStrings {
   static const String recordNoSpeechError = 'recordNoSpeechError';
   static const String recordErrorPermanentSubtitle = 'recordErrorPermanentSubtitle';
   static const String retry = 'retry';
-  static const String recordStatusIdle = 'recordStatusIdle';
-  static const String recordStatusRecording = 'recordStatusRecording';
   static const String recordRecentActivityTitle = 'recordRecentActivityTitle';
   static const String recordRecentActivityEmpty = 'recordRecentActivityEmpty';
+  static const String recordRecentActivityOff = 'recordRecentActivityOff';
   static const String recordRecentActivityUntitled = 'recordRecentActivityUntitled';
+  static const String recordRecentActivityHint = 'recordRecentActivityHint';
   static const String recordActivityJustNow = 'recordActivityJustNow';
   static const String recordActivityMinutesAgo = 'recordActivityMinutesAgo';
   static const String recordActivityHoursAgo = 'recordActivityHoursAgo';
+  static const String recordActivityDaysAgo = 'recordActivityDaysAgo';
 
   static const String jobCardTitle = 'jobCardTitle';
   static const String jobCardVehicleInfo = 'jobCardVehicleInfo';
@@ -61,6 +60,8 @@ class AppStrings {
   static const String settingsPdfFolderChoose = 'settingsPdfFolderChoose';
   static const String settingsPdfFolderReset = 'settingsPdfFolderReset';
   static const String settingsPdfFolderError = 'settingsPdfFolderError';
+  static const String settingsPdfFolderIosLocation = 'settingsPdfFolderIosLocation';
+  static const String settingsPdfFolderIosNote = 'settingsPdfFolderIosNote';
   static const String settingsShopLogo = 'settingsShopLogo';
   static const String settingsShopLogoDescription = 'settingsShopLogoDescription';
   static const String settingsShopLogoUpload = 'settingsShopLogoUpload';
@@ -68,6 +69,15 @@ class AppStrings {
   static const String settingsShopLogoDefaultLabel = 'settingsShopLogoDefaultLabel';
   static const String settingsShopLogoUploadError = 'settingsShopLogoUploadError';
   static const String settingsShopLogoRemoveError = 'settingsShopLogoRemoveError';
+  static const String settingsShopLogoSourceTitle = 'settingsShopLogoSourceTitle';
+  static const String settingsShopLogoSourcePhotos = 'settingsShopLogoSourcePhotos';
+  static const String settingsShopLogoSourceFiles = 'settingsShopLogoSourceFiles';
+  static const String settingsShopLogoFormats = 'settingsShopLogoFormats';
+  static const String settingsShopLogoUnsupported = 'settingsShopLogoUnsupported';
+  static const String settingsRecentActivity = 'settingsRecentActivity';
+  static const String settingsRecentActivityDescription = 'settingsRecentActivityDescription';
+  static const String settingsRecentActivityOff = 'settingsRecentActivityOff';
+  static const String settingsRecentActivityCount = 'settingsRecentActivityCount';
   static const String settingsOrganization = 'settingsOrganization';
   static const String settingsOrganizationDescription = 'settingsOrganizationDescription';
   static const String settingsOrganizationManage = 'settingsOrganizationManage';

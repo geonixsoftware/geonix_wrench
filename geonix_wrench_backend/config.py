@@ -115,7 +115,22 @@ RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
 RATE_LIMIT_DEFAULT_PER_WINDOW = int(os.getenv("RATE_LIMIT_DEFAULT_PER_WINDOW", "120"))
 RATE_LIMIT_AUDIO_PER_WINDOW = int(os.getenv("RATE_LIMIT_AUDIO_PER_WINDOW", "10"))
 
-ALLOWED_LOGO_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+# Everything a shop is plausibly handed its logo as. SVG is included and
+# rasterised on save (see logo_storage) — it is the format a designer delivers,
+# and rejecting it was the most common reason an upload failed.
+ALLOWED_LOGO_EXTENSIONS = {
+    ".svg",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".gif",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".heic",
+    ".heif",
+}
 MAX_LOGO_SIZE_BYTES = 5 * 1024 * 1024
 LOGO_STORAGE_DIR = os.getenv("LOGO_STORAGE_DIR", "storage/logos")
 MAX_LOGO_DIMENSION_PX = 1000

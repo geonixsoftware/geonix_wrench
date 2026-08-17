@@ -15,15 +15,17 @@ from reportlab.platypus import (
     TableStyle,
 )
 from PIL import Image as PILImage
+from svglib.svglib import svg2rlg
 
 from config import (
     DEFAULT_CURRENCY,
     DEFAULT_LABOR_RATE,
+    DEFAULT_LOGO_PATH,
     MAX_FIELD_CHARS,
     MAX_PARTS_PER_JOBCARD,
     SUPPORTED_CURRENCIES,
 )
-from logo_storage import get_active_logo_path
+from logo_storage import SVG_EXTENSION, get_active_logo_path
 from scoping import OwnerScope
 
 BRAND_COLOR = colors.HexColor("#1F3A5F")
@@ -74,13 +76,35 @@ def _format_labor_time(hours: float) -> str:
     return f"{m}m"
 
 
-def _build_header_image(owner: OwnerScope) -> Image:
+LOGO_MAX_HEIGHT = 0.5 * inch
+LOGO_MAX_WIDTH = 2.5 * inch
+
+
+def _build_header_image(owner: OwnerScope):
+    """The shop's logo, fitted into the header box.
+
+    A stored SVG is drawn as vector rather than as a picture of one: it goes
+    into the story as a reportlab Drawing, so it prints at the printer's
+    resolution instead of the 1000px cap raster uploads carry.
+    """
     logo_path = get_active_logo_path(owner)
+
+    if logo_path.lower().endswith(SVG_EXTENSION):
+        drawing = svg2rlg(logo_path)
+        if drawing is not None and drawing.width and drawing.height:
+            scale = min(LOGO_MAX_HEIGHT / drawing.height, LOGO_MAX_WIDTH / drawing.width)
+            drawing.width *= scale
+            drawing.height *= scale
+            drawing.scale(scale, scale)
+            drawing.hAlign = "LEFT"
+            return drawing
+        # A logo that stopped parsing must not cost the shop its job card; fall
+        # through to the packaged default.
+        logo_path = DEFAULT_LOGO_PATH
+
     with PILImage.open(logo_path) as img:
         width_px, height_px = img.size
-    max_height = 0.5 * inch
-    max_width = 2.5 * inch
-    scale = min(max_height / height_px, max_width / width_px)
+    scale = min(LOGO_MAX_HEIGHT / height_px, LOGO_MAX_WIDTH / width_px)
     return Image(logo_path, width=width_px * scale, height=height_px * scale, hAlign="LEFT")
 
 

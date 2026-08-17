@@ -1,6 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Saving job card PDFs to the shared Downloads folder. Capped at API 28:
+         from API 29 scoped storage governs that folder instead, and PdfService
+         probes the write and falls back to app storage when it is refused. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"/>
     <application
         android:label="geonix_wrench_app"
         android:name="${applicationName}"

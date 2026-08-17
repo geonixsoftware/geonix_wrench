@@ -30,6 +30,16 @@ class BlockScaffold extends StatelessWidget {
     ),
   });
 
+  /// Padding for a block that carries nothing but [AppHeaderBar] — the tab
+  /// screens. The default leaves room under the header for a headline; without
+  /// one, that room reads as a large empty band of near-black.
+  static const EdgeInsets compactHeaderPadding = EdgeInsets.fromLTRB(
+    AppTheme.space6,
+    AppTheme.space2,
+    AppTheme.space6,
+    AppTheme.space5,
+  );
+
   /// Content drawn on the dark block. Rendered with [AppPalette.onBlock]
   /// as the default ink, so callers do not have to recolour every child.
   final Widget header;

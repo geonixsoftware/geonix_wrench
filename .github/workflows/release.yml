@@ -1,16 +1,18 @@
 name: Release
 
-# Builds the desktop downloads offered on the website and attaches them to a
-# GitHub Release. Each one has to be built on its own OS — Windows and Linux
+# Builds the downloads offered on the website and attaches them to a GitHub
+# Release. Each desktop target has to be built on its own OS — Windows and Linux
 # cannot be cross-compiled from a Mac, which is the whole reason this runs in
 # CI rather than on someone's laptop.
 #
-# Currently macOS and Windows only. The Linux job is commented out further
-# down after an AOT snapshotter crash; the website's Linux row still links a
-# .deb that nothing produces.
+# Currently Android, macOS and Windows. The Linux job is commented out further
+# down after an AOT snapshotter crash, and the website's Linux row says "Coming
+# soon" to match.
 #
-# iOS and Android are deliberately absent: they ship through the App Store and
-# Google Play, so there is no file for the website to link to.
+# Android is here because the website needs a file for it: Play is a store
+# listing, not a link, and a shop that wants the app today installs the .apk
+# directly. iOS is the one target with no artifact at all — Apple installs only
+# through the App Store or TestFlight, so there is nothing to attach.
 
 on:
   push:
@@ -45,6 +47,89 @@ jobs:
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "Building version $V"
+
+  android:
+    name: Android (.apk)
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      # android/app/build.gradle.kts throws outright if key.properties is
+      # missing, by design — it refuses to fall back to the publicly known debug
+      # keystore for a release build. So the real keystore is reconstructed here
+      # from secrets.
+      #
+      # Create the four secrets once, from the keystore in
+      # android/key.properties.example's instructions:
+      #   ANDROID_KEYSTORE_BASE64  base64 -i upload-keystore.jks
+      #   ANDROID_KEYSTORE_PASSWORD
+      #   ANDROID_KEY_ALIAS
+      #   ANDROID_KEY_PASSWORD
+      #
+      # Without them this job warns and produces nothing, rather than failing.
+      # A hard failure here would take the macOS and Windows downloads with it,
+      # since publish waits on all three — and there is no reason a missing
+      # Android key should block a desktop release. The publish job re-checks
+      # what actually arrived and warns about any advertised row left dead.
+      - name: Restore signing keystore
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not set, so no .apk was built. The website's Android row links to this artifact and will 404 until the four ANDROID_* secrets exist."
+            exit 0
+          fi
+          echo "available=true" >> "$GITHUB_OUTPUT"
+          cd geonix_wrench_app/android
+          # Written to the runner's temp dir, never into the checkout, and the
+          # runner is discarded when the job ends.
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
+          cat > key.properties <<EOF
+          storeFile=$RUNNER_TEMP/upload-keystore.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Build
+        if: steps.signing.outputs.available == 'true'
+        working-directory: geonix_wrench_app
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: Rename artifact
+        if: steps.signing.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp geonix_wrench_app/build/app/outputs/flutter-apk/app-release.apk \
+            "dist/geonix-wrench-${{ needs.version.outputs.version }}-android.apk"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.signing.outputs.available == 'true'
+        with:
+          name: android
+          path: dist/*.apk
+          if-no-files-found: error
 
   macos:
     name: macOS (.dmg)
@@ -269,7 +354,7 @@ jobs:
     name: Publish release
     # `linux` removed alongside the commented-out job: a needs: entry naming a
     # job that does not exist makes the whole workflow fail to parse.
-    needs: [version, macos, windows]
+    needs: [version, android, macos, windows]
     runs-on: ubuntu-latest
     # Scoped to this job rather than the whole workflow: only the release step
     # writes anything, and the three build jobs have no reason to hold a
@@ -287,10 +372,42 @@ jobs:
           mkdir -p dist
           find artifacts -type f -exec mv {} dist/ \;
           cd dist
+
+          # Unversioned aliases. The website links to
+          #   /releases/latest/download/geonix-wrench-<platform>.<ext>
+          # which resolves only if an asset carries exactly that name — the
+          # versioned filenames cannot satisfy it. Uploading both means the site
+          # never needs editing when the version changes, while the versioned
+          # copy stays as the archival name people can cite.
+          VERSION="${{ needs.version.outputs.version }}"
           for f in *; do
+            alias_name="${f/-$VERSION-/-}"
+            [ "$alias_name" = "$f" ] && continue
+            cp "$f" "$alias_name"
+          done
+
+          for f in *; do
+            case "$f" in *.sha256) continue ;; esac
             shasum -a 256 "$f" > "$f.sha256"
           done
           ls -lh
+
+      # The website advertises these three by name. If a build job produced
+      # nothing, the row it belongs to is a 404 the moment someone presses
+      # Publish — so say so here, while the release is still a draft and the
+      # person about to publish it is looking at this run.
+      - name: Check every advertised download is present
+        run: |
+          set -uo pipefail
+          missing=()
+          for f in geonix-wrench-android.apk geonix-wrench-macos.dmg geonix-wrench-windows.exe; do
+            [ -f "dist/$f" ] || missing+=("$f")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::warning::Not built: ${missing[*]}. geonix_wrench.html links to these, so those rows will 404. Fix them, or set those rows back to 'Coming soon', before publishing."
+          else
+            echo "All three advertised downloads are present."
+          fi
 
       # Created as a draft on purpose: the site's download links point at these
       # URLs, so nothing should be reachable until someone has installed each

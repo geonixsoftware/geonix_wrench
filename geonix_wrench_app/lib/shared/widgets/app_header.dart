@@ -12,18 +12,50 @@ import 'geonix_logo.dart';
 /// [BlockScaffold] already owns the safe-area inset the old version
 /// mis-measured.
 class AppHeaderBar extends StatelessWidget {
-  const AppHeaderBar({super.key, this.actions});
+  const AppHeaderBar({super.key, this.label, this.actions});
+
+  /// Caption printed immediately after the wordmark, behind a hairline rule —
+  /// the date on the record screen, the screen name elsewhere.
+  ///
+  /// This is where a screen's second line of information goes now. It used to
+  /// be a 34px headline stacked *under* this bar, which cost roughly a third of
+  /// the block's height to say "Ready to record" — something the record control
+  /// below already says by existing.
+  final String? label;
 
   final List<Widget>? actions;
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+    final theme = Theme.of(context);
+
     return SizedBox(
-      height: 44,
+      height: 40,
       child: Row(
         children: [
-          const GeonixLogo(height: 26, onDark: true),
-          const Spacer(),
+          const GeonixLogo(height: 34, onDark: true),
+          if (label != null) ...[
+            const SizedBox(width: AppTheme.space3),
+            Container(
+              width: 1,
+              height: 18,
+              color: p.onBlockMuted.withValues(alpha: 0.35),
+            ),
+            const SizedBox(width: AppTheme.space3),
+            Expanded(
+              child: Text(
+                label!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontSize: 13,
+                  color: p.onBlockMuted,
+                ),
+              ),
+            ),
+          ] else
+            const Spacer(),
           if (actions != null)
             Row(
               mainAxisSize: MainAxisSize.min,

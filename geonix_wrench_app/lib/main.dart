@@ -6,6 +6,7 @@ import 'app.dart';
 import 'core/auth/auth_service.dart';
 import 'core/billing/billing_controller.dart';
 import 'core/services/billing_service.dart';
+import 'core/services/recent_activity_store.dart';
 import 'core/services/user_profile_service.dart';
 import 'core/settings/app_settings.dart';
 import 'core/user/user_profile_controller.dart';
@@ -24,10 +25,16 @@ void main() async {
   final settings = AppSettings();
   await settings.load();
 
+  // Loaded up front for the same reason as settings: the record screen reads
+  // it on its first frame, and this history lives only on this device.
+  final recentActivity = RecentActivityStore();
+  await recentActivity.load();
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: settings),
+        ChangeNotifierProvider.value(value: recentActivity),
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProxyProvider<AuthService, UserProfileController>(
           create: (context) => UserProfileController(

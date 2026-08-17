@@ -26,6 +26,16 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- iOS gives third-party apps no shared Downloads folder, so job card PDFs
+	     are written into the app's own Documents directory. These two keys are
+	     what make that directory reachable: the app appears in the Files app
+	     under "On My iPhone", and the saved PDFs can be opened, copied and
+	     shared from there. Without them the documents exist but nothing on the
+	     phone can browse to them. -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Geonix Wrench needs microphone access to record job audio for processing.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

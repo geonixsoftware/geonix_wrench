@@ -39,6 +39,7 @@ from database import (
 )
 from extraction import ExtractionError, extract_jobcard
 from logo_storage import (
+    SVG_EXTENSION,
     InvalidLogoError,
     delete_shop_logo,
     get_active_logo_path,
@@ -317,7 +318,21 @@ def get_shop_logo_status(user: dict = Depends(get_current_user)) -> ShopLogoStat
 
 @app.get("/api/shop-logo")
 def get_shop_logo(user: dict = Depends(get_current_user)) -> FileResponse:
-    return FileResponse(get_active_logo_path(resolve_owner_scope(user)), media_type="image/png")
+    path = get_active_logo_path(resolve_owner_scope(user))
+    is_svg = path.lower().endswith(SVG_EXTENSION)
+    return FileResponse(
+        path,
+        media_type="image/svg+xml" if is_svg else "image/png",
+        # An SVG is a document a browser will execute things inside. Uploads are
+        # already screened for scripts and external references; these headers
+        # are the second lock, so a logo can never act as a page on this origin.
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        }
+        if is_svg
+        else None,
+    )
 
 
 @app.delete("/api/shop-logo", response_model=ShopLogoStatus)

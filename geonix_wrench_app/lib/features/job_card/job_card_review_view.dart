@@ -10,6 +10,7 @@ import '../../core/l10n/app_strings.dart';
 import '../../core/models/job_card.dart';
 import '../../core/services/jobcard_update_service.dart';
 import '../../core/services/pdf_service.dart';
+import '../../core/services/recent_activity_store.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/utils/duration_formatter.dart';
 import '../../shared/widgets/app_header.dart';
@@ -91,10 +92,14 @@ class _JobCardReviewViewState extends State<JobCardReviewView> {
     }
     setState(() => _generating = true);
     final l10n = context.l10n;
+    final recentActivity = context.read<RecentActivityStore>();
     final editedCard = _buildEditedCard();
     try {
       await _updateService.update(editedCard);
       final saved = await _pdfService.generate(editedCard, currency);
+      // Lets the recent-activity row re-share this exact file later instead of
+      // only knowing the job it came from.
+      await recentActivity.attachPdf(editedCard.id, saved.path);
       if (!mounted) return;
       // Name the folder it landed in. "PDF saved" with no location was the
       // whole reason the file felt lost.
