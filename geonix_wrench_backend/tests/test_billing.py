@@ -52,8 +52,8 @@ def _patch_session_create(monkeypatch):
 def _checkout_body(plan, **overrides):
     body = {
         "plan": plan,
-        "success_url": "https://geonix.test/success",
-        "cancel_url": "https://geonix.test/cancel",
+        "success_url": "https://geonix.site/billing/success/",
+        "cancel_url": "https://geonix.site/billing/cancel/",
     }
     body.update(overrides)
     return body
@@ -330,6 +330,55 @@ def test_sync_handles_real_stripe_objects_not_just_dicts(temp_db):
     assert stored is not None
     assert stored["status"] == "active"
     assert stored["stripe_subscription_id"] == "sub_from_stripe"
+
+
+def _patch_confirmation_email(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        billing.email_service,
+        "send_subscription_confirmation",
+        lambda **kwargs: calls.append(kwargs) or True,
+    )
+    return calls
+
+
+def test_new_subscription_sends_a_confirmation_email(temp_db, monkeypatch):
+    calls = _patch_confirmation_email(monkeypatch)
+    user = _make_user("newsub@example.com")
+
+    billing._sync_subscription(_stripe_subscription(scope_type="user", scope_id=user["id"]))
+
+    assert len(calls) == 1
+    assert calls[0]["email"] == "newsub@example.com"
+    assert calls[0]["plan"] == "individual"
+
+
+def test_renewal_does_not_resend_the_confirmation_email(temp_db, monkeypatch):
+    # A renewal, a proration, or any other update to an already-active
+    # subscription fires the same webhook event as a brand new one. Only the
+    # activation itself should trigger an email.
+    calls = _patch_confirmation_email(monkeypatch)
+    user = _make_user("renewsub@example.com")
+    subscription = _stripe_subscription(scope_type="user", scope_id=user["id"])
+
+    billing._sync_subscription(subscription)
+    billing._sync_subscription(subscription)
+
+    assert len(calls) == 1
+
+
+def test_team_subscription_emails_the_shop_owner(temp_db, monkeypatch):
+    calls = _patch_confirmation_email(monkeypatch)
+    owner = _make_user("shopowner@example.com")
+    org = database.create_organization(owner["id"], "Shop", seat_limit=2)
+
+    billing._sync_subscription(
+        _stripe_subscription(scope_type="org", scope_id=org["id"], plan="team", quantity=3)
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["email"] == "shopowner@example.com"
+    assert calls[0]["seats"] == 3
 
 
 def test_reconciliation_handles_real_stripe_list_objects(temp_db, monkeypatch):
@@ -835,11 +884,11 @@ def test_portal_opens_for_an_individual_subscriber(temp_db, monkeypatch):
     captured = _patch_portal(monkeypatch)
     client = _make_client(temp_db, user["id"])
 
-    resp = client.post("/api/billing/portal-session", json={"return_url": "https://x.test/back"})
+    resp = client.post("/api/billing/portal-session", json={"return_url": "https://geonix.site/settings/"})
     assert resp.status_code == 200
     assert resp.json()["portal_url"].startswith("https://billing.stripe.com/")
     assert captured["customer"] == "cus_p"
-    assert captured["return_url"] == "https://x.test/back"
+    assert captured["return_url"] == "https://geonix.site/settings/"
     _clear_overrides()
 
 
@@ -849,7 +898,7 @@ def test_portal_requires_owner_for_a_shop(temp_db, monkeypatch):
     member = database.list_org_members(org["id"])[1]
     client = _make_client(temp_db, member["id"])
 
-    resp = client.post("/api/billing/portal-session", json={"return_url": "https://x.test/back"})
+    resp = client.post("/api/billing/portal-session", json={"return_url": "https://geonix.site/settings/"})
     assert resp.status_code == 403
     _clear_overrides()
 
@@ -859,7 +908,7 @@ def test_portal_rejected_without_a_subscription(temp_db, monkeypatch):
     _patch_portal(monkeypatch)
     client = _make_client(temp_db, user["id"])
 
-    resp = client.post("/api/billing/portal-session", json={"return_url": "https://x.test/back"})
+    resp = client.post("/api/billing/portal-session", json={"return_url": "https://geonix.site/settings/"})
     assert resp.status_code == 400
     _clear_overrides()
 
@@ -904,3 +953,43 @@ def test_invoice_without_subscription_is_ignored(temp_db, monkeypatch):
     app.dependency_overrides.clear()
     resp = client.post("/api/billing/webhook", content=b"{}", headers={"stripe-signature": "t"})
     assert resp.status_code == 200
+
+
+def test_checkout_refuses_a_return_url_off_our_site(temp_db, monkeypatch):
+    # Stripe sends the customer wherever these say. Before the host check any
+    # account holder could mint a Stripe-branded checkout that landed on a
+    # site of their choosing.
+    user = _make_user("redirect@example.com")
+    captured = _patch_session_create(monkeypatch)
+    client = _make_client(temp_db, user["id"])
+
+    resp = client.post(
+        "/api/billing/checkout-session",
+        json=_checkout_body("individual", success_url="https://evil.example/phish"),
+    )
+    assert resp.status_code == 400
+    assert "success_url" in resp.json()["detail"]
+    assert not captured, "the Stripe session must not have been created"
+
+    resp = client.post(
+        "/api/billing/checkout-session",
+        json=_checkout_body("individual", cancel_url="javascript:alert(1)"),
+    )
+    assert resp.status_code == 400
+    _clear_overrides()
+
+
+def test_portal_refuses_a_return_url_off_our_site(temp_db, monkeypatch):
+    user = _make_user("portalredirect@example.com")
+    database.upsert_subscription(
+        scope_type="user", scope_id=user["id"],
+        stripe_subscription_id="sub_r", stripe_customer_id="cus_r",
+        plan="individual", status="active", quantity=1,
+        current_period_end="2026-09-01T00:00:00+00:00",
+    )
+    _patch_portal(monkeypatch)
+    client = _make_client(temp_db, user["id"])
+
+    resp = client.post("/api/billing/portal-session", json={"return_url": "https://evil.example/"})
+    assert resp.status_code == 400
+    _clear_overrides()

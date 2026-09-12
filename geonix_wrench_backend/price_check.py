@@ -1,12 +1,16 @@
 """Verify the advertised prices match what Stripe will actually charge.
 
-The app and website display INDIVIDUAL_PRICE_PER_MONTH / TEAM_PRICE_PER_SEAT,
+The app and website display the per-region figures in config.REGION_PRICING,
 but Stripe bills whatever the price objects are set to in the dashboard. If the
 two drift, a customer is quoted one amount and charged another.
 
 Run after changing a price, in either place:
 
     python -m price_check
+
+Every region is checked. A non-baseline region with no price ids configured is
+reported but does not fail: by design it falls back to the baseline prices
+(see regions.pricing_for_region), so nothing can be mis-charged there yet.
 
 Exits non-zero on a mismatch so it can be wired into a deploy check.
 """
@@ -15,14 +19,16 @@ import sys
 
 import stripe
 
-from config import (
-    BILLING_CURRENCY,
-    INDIVIDUAL_PRICE_ID,
-    INDIVIDUAL_PRICE_PER_MONTH,
-    STRIPE_API_KEY,
-    TEAM_PRICE_ID,
-    TEAM_PRICE_PER_SEAT,
-)
+import regions
+from config import BILLING_CURRENCY, REGION_PRICING, STRIPE_API_KEY
+
+_REGION_LABELS = {
+    regions.REGION_NA: "North America",
+    regions.REGION_EU: "Europe",
+    regions.REGION_AU: "Australia",
+    regions.REGION_LATAM: "Latin America",
+    regions.REGION_ROW: "Rest of world",
+}
 
 
 def _check(label: str, price_id: str, advertised: float) -> bool:
@@ -60,11 +66,31 @@ def main() -> int:
         return 2
 
     stripe.api_key = STRIPE_API_KEY
-    print("Comparing advertised prices with Stripe:")
-    results = [
-        _check("Individual (per month)", INDIVIDUAL_PRICE_ID, INDIVIDUAL_PRICE_PER_MONTH),
-        _check("Team (per seat)", TEAM_PRICE_ID, TEAM_PRICE_PER_SEAT),
-    ]
+    print("Comparing advertised prices with Stripe, per region:")
+    results = []
+    for region, entry in REGION_PRICING.items():
+        name = _REGION_LABELS.get(region, region)
+        unconfigured = not entry["individual_price_id"] or not entry["team_price_id"]
+        if unconfigured and region != regions.BASELINE_REGION:
+            print(
+                f"  -- {name}: no Stripe prices configured — this region is "
+                "served the baseline prices until its ids are set"
+            )
+            continue
+        results.append(
+            _check(
+                f"{name} — Individual (per month)",
+                entry["individual_price_id"],
+                entry["individual_price_per_month"],
+            )
+        )
+        results.append(
+            _check(
+                f"{name} — Team (per seat)",
+                entry["team_price_id"],
+                entry["team_price_per_seat"],
+            )
+        )
 
     if all(results):
         print("All advertised prices match Stripe.")

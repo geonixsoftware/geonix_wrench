@@ -111,3 +111,44 @@ def test_handles_a_jobcard_with_no_parts():
         _jobcard(parts_used=[]), OwnerScope(org_id=None, user_id=1)
     )
     assert data.startswith(_PDF_MAGIC)
+
+
+def test_renders_a_total_priced_fluid_line():
+    # The oil case: the shop entered 48.00 for the whole 4.5 litres rather than
+    # a per-litre price. Both the fractional quantity and the absent unit price
+    # have to survive the render.
+    data = pdf_generator.generate_jobcard_pdf(
+        _jobcard(
+            parts_used=[
+                {"part_name": "5W-30 oil", "quantity": 4.5, "total_price": 48.00},
+            ]
+        ),
+        OwnerScope(org_id=None, user_id=1),
+    )
+    assert data.startswith(_PDF_MAGIC)
+
+
+def test_renders_a_total_priced_line_with_no_meaningful_rate():
+    # quantity 0 leaves no per-unit figure to print; the amount is still real,
+    # and the table must not fall over on the em dash that replaces the rate.
+    data = pdf_generator.generate_jobcard_pdf(
+        _jobcard(
+            parts_used=[{"part_name": "Shop supplies", "quantity": 0, "total_price": 15.00}]
+        ),
+        OwnerScope(org_id=None, user_id=1),
+    )
+    assert data.startswith(_PDF_MAGIC)
+
+
+def test_renders_a_mix_of_pricing_styles():
+    data = pdf_generator.generate_jobcard_pdf(
+        _jobcard(
+            parts_used=[
+                {"part_name": "Oil filter", "quantity": 1, "unit_price": 12.5},
+                {"part_name": "5W-30 oil", "quantity": 4, "total_price": 48.0},
+                {"part_name": "Sump plug washer", "quantity": 1},
+            ]
+        ),
+        OwnerScope(org_id=None, user_id=1),
+    )
+    assert data.startswith(_PDF_MAGIC)

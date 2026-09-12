@@ -1,7 +1,8 @@
 import json
 import logging
 import re
-from typing import Any, Dict
+import threading
+from typing import Any, Dict, Optional
 
 import anthropic
 import httpx
@@ -10,9 +11,12 @@ from anthropic import Anthropic
 from config import (
     MAX_TRANSCRIPT_CHARS,
     ANTHROPIC_API_KEY,
+    ANTHROPIC_MAX_RETRIES,
     ANTHROPIC_MODEL,
+    ANTHROPIC_TIMEOUT_SECONDS,
     LLM_PROVIDER,
     OLLAMA_BASE_URL,
+    OLLAMA_KEEP_ALIVE,
     OLLAMA_MODEL,
 )
 from schemas import JobCardExtraction
@@ -46,6 +50,18 @@ SYSTEM_PROMPT = (
     "unrelated make or model just because it sounds plausible — keep the text as "
     "transcribed (or use <UNKNOWN> if it's unreadable) and add an entry to "
     "unbilled_items_flagged asking the mechanic to verify the exact vehicle."
+    "\n\n"
+    "Prices are recorded the way they were spoken, never converted:\n"
+    "- A price given for the whole quantity — 'forty-eight euros of oil', "
+    "'the pads were ninety for the set' — goes in total_price, exactly as "
+    "stated. Leave unit_price null.\n"
+    "- A price given per item — 'twelve euros each', 'thirty a litre' — goes in "
+    "unit_price. Leave total_price null.\n"
+    "- Never divide a total into a per-unit price, and never multiply a "
+    "per-unit price into a total. Dividing loses cents that the invoice then "
+    "bills back to the customer at the wrong figure.\n"
+    "- If no price was mentioned for a part, leave both null. Do not guess a "
+    "price from what parts usually cost."
 )
 
 JSON_SCHEMA: Dict[str, Any] = {
@@ -60,7 +76,31 @@ JSON_SCHEMA: Dict[str, Any] = {
                 "type": "object",
                 "properties": {
                     "part_name": {"type": "string"},
-                    "quantity": {"type": "integer"},
+                    "quantity": {
+                        "type": "number",
+                        "description": (
+                            "How many were used — litres for a fluid, pieces "
+                            "otherwise. May be fractional (0.5 litres)."
+                        ),
+                    },
+                    # Both optional and mutually exclusive by instruction: the
+                    # model records whichever figure was actually spoken. See
+                    # the pricing rules in SYSTEM_PROMPT.
+                    "unit_price": {
+                        "type": ["number", "null"],
+                        "description": (
+                            "Price of ONE unit, only when a per-item price was "
+                            "stated. Never derived from a total."
+                        ),
+                    },
+                    "total_price": {
+                        "type": ["number", "null"],
+                        "description": (
+                            "Price of the WHOLE quantity, when a combined figure "
+                            "was stated. Record it exactly as spoken; never "
+                            "divide it into a unit price."
+                        ),
+                    },
                 },
                 "required": ["part_name", "quantity"],
                 "additionalProperties": False,
@@ -110,8 +150,59 @@ def extract_jobcard(transcript: str) -> JobCardExtraction:
     )
 
 
+# ------------------------------------------------------------------- clients
+#
+# Both providers are reached through a long-lived client rather than one built
+# per request. A fresh client is a fresh connection pool, so every job card was
+# paying for a new TCP connection and a full TLS handshake to the provider
+# before the first byte of the prompt went out — pure latency in front of a
+# call the mechanic is already waiting on. Reusing the client keeps the
+# connection warm between recordings.
+
+_anthropic_client: Optional[Anthropic] = None
+# The class this client was built from. Tests monkeypatch `extraction.Anthropic`
+# with a fake, and a cache keyed only on "is it None" would hand them whichever
+# client an earlier test happened to build first.
+_anthropic_client_cls: Optional[type] = None
+_client_lock = threading.Lock()
+
+_ollama_client: Optional[httpx.Client] = None
+
+
+def _get_anthropic_client() -> Anthropic:
+    global _anthropic_client, _anthropic_client_cls
+    with _client_lock:
+        if _anthropic_client is None or _anthropic_client_cls is not Anthropic:
+            _anthropic_client = Anthropic(
+                api_key=ANTHROPIC_API_KEY,
+                timeout=ANTHROPIC_TIMEOUT_SECONDS,
+                max_retries=ANTHROPIC_MAX_RETRIES,
+            )
+            _anthropic_client_cls = Anthropic
+        return _anthropic_client
+
+
+def _get_ollama_client() -> httpx.Client:
+    global _ollama_client
+    with _client_lock:
+        if _ollama_client is None:
+            _ollama_client = httpx.Client(timeout=120.0)
+        return _ollama_client
+
+
+def reset_clients() -> None:
+    """Drop the cached clients. Test hook; the server never calls this."""
+    global _anthropic_client, _anthropic_client_cls, _ollama_client
+    with _client_lock:
+        _anthropic_client = None
+        _anthropic_client_cls = None
+        if _ollama_client is not None:
+            _ollama_client.close()
+        _ollama_client = None
+
+
 def _extract_with_anthropic(transcript: str) -> JobCardExtraction:
-    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = _get_anthropic_client()
     tool_name = "extract_jobcard"
     try:
         response = client.messages.create(
@@ -167,6 +258,18 @@ def _extract_with_anthropic(transcript: str) -> JobCardExtraction:
         raise ExtractionError(
             f"The AI provider returned an error ({e.status_code}).", retryable=retryable
         ) from None
+    # Before the generic connection case: a timeout is now a deliberate ceiling
+    # of ours (ANTHROPIC_TIMEOUT_SECONDS), not an unreachable provider, and an
+    # operator reading "could not reach the AI provider" would go looking for a
+    # network fault that isn't there. APITimeoutError subclasses
+    # APIConnectionError, so this has to be matched first.
+    except anthropic.APITimeoutError:
+        logger.warning(
+            "Anthropic did not respond within %.0fs (%d attempt(s))",
+            ANTHROPIC_TIMEOUT_SECONDS,
+            ANTHROPIC_MAX_RETRIES + 1,
+        )
+        raise ExtractionError("The AI provider took too long to respond.") from None
     except anthropic.APIConnectionError as e:
         logger.warning("Could not reach Anthropic: %s", e)
         raise ExtractionError("Could not reach the AI provider.") from None
@@ -189,18 +292,23 @@ def _extract_with_ollama(transcript: str) -> JobCardExtraction:
         "Respond with ONLY a JSON object matching this schema, no other text:\n"
         f"{json.dumps(JSON_SCHEMA)}"
     )
-    with httpx.Client(timeout=120.0) as client:
-        resp = client.post(
-            f"{OLLAMA_BASE_URL}/api/generate",
-            json={
-                "model": OLLAMA_MODEL,
-                "prompt": prompt,
-                "format": "json",
-                "stream": False,
-            },
-        )
-        resp.raise_for_status()
-        raw_response = resp.json()["response"]
+    client = _get_ollama_client()
+    resp = client.post(
+        f"{OLLAMA_BASE_URL}/api/generate",
+        json={
+            "model": OLLAMA_MODEL,
+            "prompt": prompt,
+            "format": "json",
+            "stream": False,
+            # Ollama unloads the model after five idle minutes by default, so a
+            # shop with a quiet hour pays a full model load on its next job
+            # card. Holding it resident is the single biggest win available on
+            # the local-model path.
+            "keep_alive": OLLAMA_KEEP_ALIVE,
+        },
+    )
+    resp.raise_for_status()
+    raw_response = resp.json()["response"]
 
     return JobCardExtraction.model_validate(json.loads(_extract_json_block(raw_response)))
 

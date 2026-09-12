@@ -16,9 +16,27 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+# How long Ollama keeps the model resident after a request. Its default is 5
+# minutes, so the first job card after a quiet spell pays a full model load
+# before any tokens are generated. "-1" pins it in memory for good.
+OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-5")
+
+# How long one extraction call may take, and how many times the SDK may retry
+# it. Both are bounded on purpose.
+#
+# The SDK defaults are a 10-minute timeout and 2 retries, and timeouts are
+# retried — so a provider that stops responding holds a thread for up to half
+# an hour on a request whose client gave up after 180s (AudioUploadService.
+# timeout). The server was still working on recordings nobody was waiting for,
+# which is exactly the pile-up the transcription queue ceiling exists to avoid.
+#
+# 45s x 2 attempts = 90s worst case, leaving the rest of the client's 180s
+# budget to transcription.
+ANTHROPIC_TIMEOUT_SECONDS = float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "45"))
+ANTHROPIC_MAX_RETRIES = int(os.getenv("ANTHROPIC_MAX_RETRIES", "1"))
 
 # `small` rather than `medium`. Measured on a 24s job-card recording, 4 requests
 # at once on an 8-core box: medium/beam=3 took 62s per request, small/beam=1 took
@@ -40,6 +58,8 @@ WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
 _raw_whisper_language = os.getenv("WHISPER_LANGUAGE", "en")
 WHISPER_LANGUAGE = None if _raw_whisper_language.lower() == "auto" else _raw_whisper_language
 
+CPU_COUNT = os.cpu_count() or 4
+
 # How many recordings may be transcribed simultaneously.
 #
 # Transcription is CPU-bound and runs at roughly 1x real time on the medium
@@ -47,7 +67,21 @@ WHISPER_LANGUAGE = None if _raw_whisper_language.lower() == "auto" else _raw_whi
 # more of them share the same cores and finish later. Each concurrent slot also
 # holds its own model instance (~1.5 GB for `medium`), so raise it only with
 # both spare cores and spare RAM.
-WHISPER_MAX_CONCURRENT = max(1, int(os.getenv("WHISPER_MAX_CONCURRENT", "4")))
+#
+# The default used to be a flat 4, and paired with the core split below that
+# was actively slow on the box this runs on. Four slots on a 4-core VPS means
+# one core each, so a mechanic recording alone — the normal case, all day —
+# had three idle cores while their transcription crawled on the fourth. The
+# ceiling was sized for a burst that a single-shop server almost never sees,
+# and every ordinary request paid for it.
+#
+# Scaling with the machine instead: small boxes hand the whole CPU to one
+# recording and let the queue absorb bursts, and only a genuinely wide server
+# splits itself up.
+_default_whisper_concurrency = 1 if CPU_COUNT <= 4 else max(1, CPU_COUNT // 4)
+WHISPER_MAX_CONCURRENT = max(
+    1, int(os.getenv("WHISPER_MAX_CONCURRENT", str(_default_whisper_concurrency)))
+)
 
 # How many more recordings may wait for a slot before new uploads are rejected.
 #
@@ -72,7 +106,7 @@ WHISPER_CPU_THREADS = max(
     int(
         os.getenv(
             "WHISPER_CPU_THREADS",
-            str(max(1, (os.cpu_count() or 4) // WHISPER_MAX_CONCURRENT)),
+            str(max(1, CPU_COUNT // WHISPER_MAX_CONCURRENT)),
         )
     ),
 )
@@ -104,6 +138,25 @@ MAX_PARTS_PER_JOBCARD = int(os.getenv("MAX_PARTS_PER_JOBCARD", "100"))
 # Set ALLOWED_ORIGINS to a comma-separated list in production.
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
 ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
+# The built website, optionally served by this same process.
+#
+# Empty by default because nginx owns the site in the deployed setup: it serves
+# geonix_website/dist itself and proxies only /api/ here, so a second copy
+# served from this process would be a second thing to keep in step. main.py
+# skips the mount when this is empty or missing rather than failing to boot.
+#
+# Set it to run without nginx at all — uvicorn will then serve the site and the
+# API on one port:
+#
+#   FRONTEND_DIST_DIR=/var/www/geonix_wrench/geonix_website/dist
+FRONTEND_DIST_DIR = os.getenv("FRONTEND_DIST_DIR", "").strip()
+
+# How long a closed account is remembered, so a Firebase token issued before
+# the deletion cannot put the row back. Firebase ID tokens last an hour; a day
+# is comfortable headroom without keeping the record any longer than the job
+# needs. See the deleted_accounts table in database.py.
+DELETED_ACCOUNT_TOMBSTONE_HOURS = int(os.getenv("DELETED_ACCOUNT_TOMBSTONE_HOURS", "24"))
 
 # Public /docs, /redoc and /openapi.json hand an attacker the whole route map.
 # Off unless explicitly enabled.
@@ -156,8 +209,31 @@ DEFAULT_LABOR_RATE = float(os.getenv("DEFAULT_LABOR_RATE", "85.0"))
 STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 
+# Prices are regional. Five regions, resolved from the customer's country by
+# regions.region_for_country:
+#
+#   na      North America — the baseline price
+#   eu      Europe
+#   au      Australia
+#   latam   Latin America and the Caribbean
+#   row     everywhere else
+#
+# Each region has its own pair of Stripe price objects and its own advertised
+# figures. The baseline pair keeps the un-suffixed names so existing deploys and
+# imports stay valid.
 INDIVIDUAL_PRICE_ID = os.getenv("INDIVIDUAL_PRICE_ID", "price_1U3FIdAsnEuiNQHH9y7WdAqI")
 TEAM_PRICE_ID = os.getenv("TEAM_PRICE_ID", "price_1U3JqDAsnEuiNQHHLIXIjlV7")
+# Empty until the operator creates the regional price objects in the Stripe
+# dashboard. While a region's ids are unset, regions.pricing_for_region serves
+# that region the baseline prices — quote and charge always travel together.
+INDIVIDUAL_PRICE_ID_EU = os.getenv("INDIVIDUAL_PRICE_ID_EU", "")
+TEAM_PRICE_ID_EU = os.getenv("TEAM_PRICE_ID_EU", "")
+INDIVIDUAL_PRICE_ID_AU = os.getenv("INDIVIDUAL_PRICE_ID_AU", "")
+TEAM_PRICE_ID_AU = os.getenv("TEAM_PRICE_ID_AU", "")
+INDIVIDUAL_PRICE_ID_LATAM = os.getenv("INDIVIDUAL_PRICE_ID_LATAM", "")
+TEAM_PRICE_ID_LATAM = os.getenv("TEAM_PRICE_ID_LATAM", "")
+INDIVIDUAL_PRICE_ID_ROW = os.getenv("INDIVIDUAL_PRICE_ID_ROW", "")
+TEAM_PRICE_ID_ROW = os.getenv("TEAM_PRICE_ID_ROW", "")
 TEAM_MIN_SEATS = int(os.getenv("TEAM_MIN_SEATS", "2"))
 
 # Advertised prices, served to the app and the website so the figure is defined
@@ -166,10 +242,70 @@ TEAM_MIN_SEATS = int(os.getenv("TEAM_MIN_SEATS", "2"))
 # !! These are DISPLAY values only. Stripe charges whatever the price objects
 # above are set to in the dashboard — changing a number here does not change
 # what a customer pays. Keep the two in step, or a customer is quoted one amount
-# and billed another. `python -m price_check` verifies they match.
-INDIVIDUAL_PRICE_PER_MONTH = float(os.getenv("INDIVIDUAL_PRICE_PER_MONTH", "29"))
-TEAM_PRICE_PER_SEAT = float(os.getenv("TEAM_PRICE_PER_SEAT", "25"))
+# and billed another. `python -m price_check` verifies they match, per region.
+INDIVIDUAL_PRICE_PER_MONTH = float(os.getenv("INDIVIDUAL_PRICE_PER_MONTH", "35"))
+TEAM_PRICE_PER_SEAT = float(os.getenv("TEAM_PRICE_PER_SEAT", "60"))
+INDIVIDUAL_PRICE_PER_MONTH_EU = float(os.getenv("INDIVIDUAL_PRICE_PER_MONTH_EU", "29"))
+TEAM_PRICE_PER_SEAT_EU = float(os.getenv("TEAM_PRICE_PER_SEAT_EU", "50"))
+INDIVIDUAL_PRICE_PER_MONTH_AU = float(os.getenv("INDIVIDUAL_PRICE_PER_MONTH_AU", "35"))
+TEAM_PRICE_PER_SEAT_AU = float(os.getenv("TEAM_PRICE_PER_SEAT_AU", "60"))
+INDIVIDUAL_PRICE_PER_MONTH_LATAM = float(os.getenv("INDIVIDUAL_PRICE_PER_MONTH_LATAM", "10"))
+TEAM_PRICE_PER_SEAT_LATAM = float(os.getenv("TEAM_PRICE_PER_SEAT_LATAM", "18"))
+INDIVIDUAL_PRICE_PER_MONTH_ROW = float(os.getenv("INDIVIDUAL_PRICE_PER_MONTH_ROW", "10"))
+TEAM_PRICE_PER_SEAT_ROW = float(os.getenv("TEAM_PRICE_PER_SEAT_ROW", "18"))
 BILLING_CURRENCY = os.getenv("BILLING_CURRENCY", "EUR")
+
+# One row per region: the Stripe price ids that charge and the figures that are
+# advertised, kept side by side so they cannot be read from different regions.
+# Consumed through regions.pricing_for_region, which applies the fallback rule
+# above — read it through that, not directly.
+REGION_PRICING = {
+    "na": {
+        "region": "na",
+        "individual_price_id": INDIVIDUAL_PRICE_ID,
+        "team_price_id": TEAM_PRICE_ID,
+        "individual_price_per_month": INDIVIDUAL_PRICE_PER_MONTH,
+        "team_price_per_seat": TEAM_PRICE_PER_SEAT,
+    },
+    "eu": {
+        "region": "eu",
+        "individual_price_id": INDIVIDUAL_PRICE_ID_EU,
+        "team_price_id": TEAM_PRICE_ID_EU,
+        "individual_price_per_month": INDIVIDUAL_PRICE_PER_MONTH_EU,
+        "team_price_per_seat": TEAM_PRICE_PER_SEAT_EU,
+    },
+    "au": {
+        "region": "au",
+        "individual_price_id": INDIVIDUAL_PRICE_ID_AU,
+        "team_price_id": TEAM_PRICE_ID_AU,
+        "individual_price_per_month": INDIVIDUAL_PRICE_PER_MONTH_AU,
+        "team_price_per_seat": TEAM_PRICE_PER_SEAT_AU,
+    },
+    "latam": {
+        "region": "latam",
+        "individual_price_id": INDIVIDUAL_PRICE_ID_LATAM,
+        "team_price_id": TEAM_PRICE_ID_LATAM,
+        "individual_price_per_month": INDIVIDUAL_PRICE_PER_MONTH_LATAM,
+        "team_price_per_seat": TEAM_PRICE_PER_SEAT_LATAM,
+    },
+    "row": {
+        "region": "row",
+        "individual_price_id": INDIVIDUAL_PRICE_ID_ROW,
+        "team_price_id": TEAM_PRICE_ID_ROW,
+        "individual_price_per_month": INDIVIDUAL_PRICE_PER_MONTH_ROW,
+        "team_price_per_seat": TEAM_PRICE_PER_SEAT_ROW,
+    },
+}
+
+# Where Stripe may send a customer back to after checkout or the billing
+# portal. The app supplies these URLs per request, and Stripe will redirect to
+# whatever it is given — so without a host check any account holder could mint
+# a Stripe-hosted page that lands on a site of their choosing. Comma-separated
+# hostnames; the defaults are the public site and local development.
+_raw_return_hosts = os.getenv("ALLOWED_RETURN_HOSTS", "").strip()
+ALLOWED_RETURN_HOSTS = {
+    h.strip().lower() for h in _raw_return_hosts.split(",") if h.strip()
+} or {"geonix.site", "www.geonix.site", "localhost", "127.0.0.1"}
 
 # Stripe enables "Managed Payments" by default on new accounts, and it requires
 # every product in a checkout line item to carry an eligible product tax code.
@@ -180,3 +316,92 @@ BILLING_CURRENCY = os.getenv("BILLING_CURRENCY", "EUR")
 # it on instead, set eligible tax codes on both products in the Stripe dashboard
 # and then set STRIPE_MANAGED_PAYMENTS=true.
 STRIPE_MANAGED_PAYMENTS = os.getenv("STRIPE_MANAGED_PAYMENTS", "false").lower() == "true"
+
+# Transactional email (subscription confirmations, etc.), sent over plain SMTP
+# so this works against whatever relay the operator already has — SendGrid,
+# Mailgun, Postmark, Gmail, or a local catcher like MailHog for development —
+# without a vendor-specific SDK. See email_service.py.
+#
+# SMTP_HOST unset (the default) turns every send into a no-op that only logs,
+# so a laptop with nothing configured never tries to reach a real mail server.
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").strip().lower() == "true"
+EMAIL_FROM_ADDRESS = os.getenv("EMAIL_FROM_ADDRESS", "billing@geonix.site").strip()
+EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Geonix Wrench").strip()
+
+# What the admin dashboard subtracts from estimated revenue to show "profit".
+#
+# Nothing in this app tracks Stripe fees, server costs or payroll, so this is
+# not derived — it is whatever the operator sets it to. Zero (the default)
+# means profit is shown equal to revenue, which is a placeholder, not a real
+# profit figure, until this is filled in. See admin.get_stats.
+ADMIN_MONTHLY_COSTS = float(os.getenv("ADMIN_MONTHLY_COSTS", "0"))
+
+# The admin portal (admin_portal.py) refuses to start without this. It binds to
+# loopback by default, but loopback is not a boundary a browser respects: any
+# page open on the same machine can post to it. HTTP Basic auth with this
+# password is what makes the revenue figures and the hide/unhide buttons
+# actually private. Any length; generate one with
+#   python -c 'import secrets; print(secrets.token_urlsafe(24))'
+ADMIN_PORTAL_PASSWORD = os.getenv("ADMIN_PORTAL_PASSWORD", "").strip()
+
+# ── Device limits ─────────────────────────────────────────────────────────
+#
+# How many devices may be signed in to one account at once. The quota follows
+# the *role*, not the plan row, because that is the thing that actually differs:
+# an Individual subscriber and a shop owner are both one person with a phone, a
+# tablet and a workshop desktop, while an employee is issued one device by the
+# shop and sharing that login is exactly what the limit exists to stop.
+#
+#   Individual subscription ....... 3
+#   Team subscription, owner ...... 3
+#   Team subscription, employee ... 1
+#
+# An account with no active subscription is quoted the individual figure. It is
+# deliberately not the strictest number: an unsubscribed account cannot record
+# or export anything anyway, so there is nothing to protect there, and locking
+# someone to one device before they have paid only gets in the way of the
+# screen where they would pay.
+DEVICE_LIMIT_INDIVIDUAL = int(os.getenv("DEVICE_LIMIT_INDIVIDUAL", "3"))
+DEVICE_LIMIT_TEAM_OWNER = int(os.getenv("DEVICE_LIMIT_TEAM_OWNER", "3"))
+DEVICE_LIMIT_TEAM_MEMBER = int(os.getenv("DEVICE_LIMIT_TEAM_MEMBER", "1"))
+
+# What happens when a sign-in would be one device over the quota.
+#
+#   "evict_oldest" — the least recently used device is signed out and the new
+#                    one is let in. The default, because the alternative
+#                    strands someone on the device in their hand with an error
+#                    naming a laptop they may be nowhere near.
+#   "reject"       — the new sign-in is refused with 403 and the user has to
+#                    free a slot from Settings first.
+DEVICE_LIMIT_POLICY = os.getenv("DEVICE_LIMIT_POLICY", "evict_oldest").strip().lower()
+
+# Whether a request with no X-Device-Id header is refused.
+#
+# Off by default so builds of the app that predate device tracking keep working
+# — they simply go uncounted. Turn it on once every shipped client sends the
+# header, otherwise dropping it is a one-line way around the quota.
+REQUIRE_DEVICE_ID = os.getenv("REQUIRE_DEVICE_ID", "false").strip().lower() == "true"
+
+# How long a signed-out device is remembered.
+#
+# The row is kept rather than deleted so the device learns it was signed out
+# instead of silently re-registering itself on its next request — which would
+# undo the eviction that just happened. 30 days is far past any Firebase
+# token's life; the row is only an identifier-shaped hash after that.
+DEVICE_SESSION_RETENTION_HOURS = int(os.getenv("DEVICE_SESSION_RETENTION_HOURS", "720"))
+
+# Don't rewrite last_seen_at on every single request. Eviction picks the least
+# recently used device, so the timestamp only has to be accurate to within a
+# few minutes, and a write per request would triple the database traffic of a
+# read-only screen.
+DEVICE_LAST_SEEN_REFRESH_SECONDS = int(os.getenv("DEVICE_LAST_SEEN_REFRESH_SECONDS", "300"))
+
+# Bounds on the client-supplied strings. The id is hashed before storage, so
+# the cap is only there to stop an unbounded body reaching the hash function;
+# the name is shown back to the user and is truncated to fit.
+DEVICE_ID_MAX_LENGTH = 200
+DEVICE_NAME_MAX_LENGTH = 80

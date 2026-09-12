@@ -1,35 +1,74 @@
 import logging
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlsplit
 
 import stripe
 from fastapi import HTTPException
 
 import database
+import devices
+import email_service
+import regions
 from config import (
+    ALLOWED_RETURN_HOSTS,
     BILLING_CURRENCY,
-    INDIVIDUAL_PRICE_ID,
-    INDIVIDUAL_PRICE_PER_MONTH,
     STRIPE_API_KEY,
     STRIPE_MANAGED_PAYMENTS,
     STRIPE_WEBHOOK_SECRET,
     TEAM_MIN_SEATS,
-    TEAM_PRICE_ID,
-    TEAM_PRICE_PER_SEAT,
 )
 
 logger = logging.getLogger(__name__)
 
 ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing"}
 
-PLAN_PRICES = {
-    "individual": INDIVIDUAL_PRICE_ID,
-    "team": TEAM_PRICE_ID,
-}
+PLANS = ("individual", "team")
+
+# The detail on the 402 the paid routes answer with. Named so the app can
+# recognise it and open the plan picker instead of showing a generic error.
+SUBSCRIPTION_REQUIRED_DETAIL = "An active subscription is required for this."
 
 
 def init_stripe() -> None:
     stripe.api_key = STRIPE_API_KEY
+
+
+def is_account_active(user: dict) -> bool:
+    """Whether this account is currently paid for, on the server's own record.
+
+    The app checks its cached billing status before recording, but the API
+    used to take the app's word for it: every route only required a valid
+    Firebase token, and signing up for one is self-service. Anyone could
+    call the transcription endpoint directly and run Whisper and a paid model
+    on this server without ever subscribing. This is the server-side answer,
+    read fresh from the subscriptions table on each call.
+
+    A shop member is covered by the shop's Team subscription; everyone else
+    by their own.
+    """
+    if user.get("org_id") is not None:
+        sub = database.get_subscription("org", user["org_id"])
+    else:
+        sub = database.get_subscription("user", user["id"])
+    return sub is not None and sub["status"] in ACTIVE_SUBSCRIPTION_STATUSES
+
+
+def _validate_return_url(url: str, field: str) -> str:
+    """Refuse a redirect target that is not one of our own pages.
+
+    Stripe sends the customer wherever these say, and they arrive from the
+    client. Restricting the host is what stops an account holder minting a
+    Stripe-branded page that lands somewhere of their choosing.
+    """
+    parts = urlsplit(url or "")
+    host = (parts.hostname or "").lower()
+    if parts.scheme not in ("http", "https") or not host or host not in ALLOWED_RETURN_HOSTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{field} must point at one of: {', '.join(sorted(ALLOWED_RETURN_HOSTS))}",
+        )
+    return url
 
 
 def _field(payload, key: str, default=None):
@@ -69,14 +108,6 @@ def _rows_of(listing) -> list:
     return list(getattr(listing, "data", None) or [])
 
 
-def _plan_from_price(price_id: Optional[str]) -> str:
-    if price_id == TEAM_PRICE_ID:
-        return "team"
-    if price_id == INDIVIDUAL_PRICE_ID:
-        return "individual"
-    return "unknown"
-
-
 def create_checkout_session(
     *,
     plan: str,
@@ -84,9 +115,19 @@ def create_checkout_session(
     user: dict,
     success_url: str,
     cancel_url: str,
+    country: Optional[str] = None,
 ) -> str:
-    if plan not in PLAN_PRICES:
+    if plan not in PLANS:
         raise HTTPException(status_code=400, detail=f"Unknown plan: {plan}")
+    _validate_return_url(success_url, "success_url")
+    _validate_return_url(cancel_url, "cancel_url")
+
+    # Regional pricing: the app sends the device's country and the matching
+    # Stripe price is charged. See regions.py for the mapping and its limits.
+    pricing = regions.pricing_for_country(country)
+    price_id = (
+        pricing["individual_price_id"] if plan == "individual" else pricing["team_price_id"]
+    )
 
     if plan == "individual":
         if user["org_id"] is not None:
@@ -122,7 +163,7 @@ def create_checkout_session(
     try:
         session = stripe.checkout.Session.create(
             mode="subscription",
-            line_items=[{"price": PLAN_PRICES[plan], "quantity": line_quantity}],
+            line_items=[{"price": price_id, "quantity": line_quantity}],
             customer_email=user["email"],
             success_url=success_url,
             cancel_url=cancel_url,
@@ -141,6 +182,10 @@ def create_checkout_session(
                     "scope_type": scope_type,
                     "scope_id": str(scope_id),
                     "plan": plan,
+                    # The effective pricing region, recorded so a subscription
+                    # can be attributed to its rate without reverse-engineering
+                    # the price id.
+                    "region": pricing["region"],
                 }
             },
         )
@@ -160,6 +205,7 @@ def create_portal_session(*, user: dict, return_url: str) -> str:
     Previously a customer could subscribe but had no way to cancel, change a
     card or fetch an invoice without emailing us. Stripe hosts all of that.
     """
+    _validate_return_url(return_url, "return_url")
     if user["org_id"] is not None:
         if user["org_role"] != "owner":
             raise HTTPException(
@@ -189,7 +235,26 @@ def create_portal_session(*, user: dict, return_url: str) -> str:
     return session.url
 
 
-def get_billing_status(user: dict) -> dict:
+def _device_quota(user: dict) -> dict:
+    """The device allowance for this account, for the subscription panel.
+
+    Served from the billing status rather than a separate call because the app
+    shows it on the plan card, right beside the seat count — a second round
+    trip would leave that one line loading after the rest of the card had
+    rendered.
+    """
+    return {
+        "device_limit": devices.resolve_device_limit(user),
+        "device_used": database.count_active_device_sessions(user["id"]),
+    }
+
+
+def get_billing_status(user: dict, country: Optional[str] = None) -> dict:
+    # The advertised figures follow the caller's region, resolved fresh on each
+    # read from the country the app sends. Stripe still charges whatever price
+    # object the subscription was created with.
+    pricing = regions.pricing_for_country(country)
+
     if user["org_id"] is not None:
         org = database.get_organization(user["org_id"])
         if org is None:
@@ -208,12 +273,17 @@ def get_billing_status(user: dict) -> dict:
             # hardcoded 2, so the floor stays defined in one place.
             "min_seats": TEAM_MIN_SEATS,
             "team_min_seats": TEAM_MIN_SEATS,
-            "price_per_seat": TEAM_PRICE_PER_SEAT,
-            "individual_price": INDIVIDUAL_PRICE_PER_MONTH,
-            "team_price_per_seat": TEAM_PRICE_PER_SEAT,
+            "price_per_seat": pricing["team_price_per_seat"],
+            "individual_price": pricing["individual_price_per_month"],
+            "team_price_per_seat": pricing["team_price_per_seat"],
+            "region": pricing["region"],
             "needs_shop": False,
             "currency": BILLING_CURRENCY,
             "can_manage_seats": is_active and user["org_role"] == "owner",
+            # Owner and employee sit on the same Team subscription and get
+            # different device quotas, so this is resolved from the role rather
+            # than from the plan. See devices.resolve_device_limit.
+            **_device_quota(user),
         }
 
     sub = database.get_subscription("user", user["id"])
@@ -239,11 +309,13 @@ def get_billing_status(user: dict) -> dict:
         # Tells the app to prompt for a shop name; it must not offer a seat
         # count there, because the count is whatever was purchased.
         "needs_shop": awaiting_shop,
-        "price_per_seat": INDIVIDUAL_PRICE_PER_MONTH,
-        "individual_price": INDIVIDUAL_PRICE_PER_MONTH,
-        "team_price_per_seat": TEAM_PRICE_PER_SEAT,
+        "price_per_seat": pricing["individual_price_per_month"],
+        "individual_price": pricing["individual_price_per_month"],
+        "team_price_per_seat": pricing["team_price_per_seat"],
+        "region": pricing["region"],
         "currency": BILLING_CURRENCY,
         "can_manage_seats": False,
+        **_device_quota(user),
     }
 
 
@@ -370,7 +442,7 @@ def attach_subscription_to_org(*, subscription: dict, org_id: int) -> None:
             )
 
 
-def update_team_seats(*, user: dict, quantity: int) -> dict:
+def update_team_seats(*, user: dict, quantity: int, country: Optional[str] = None) -> dict:
     """Change the seat count on an existing Team subscription.
 
     Purchasing seats was already possible at checkout, but the count was frozen
@@ -430,7 +502,7 @@ def update_team_seats(*, user: dict, quantity: int) -> dict:
         quantity=quantity,
         current_period_end=sub["current_period_end"],
     )
-    return get_billing_status(user)
+    return get_billing_status(user, country)
 
 
 def cancel_subscriptions_for_account(user: dict) -> list:
@@ -536,9 +608,15 @@ def _sync_subscription(subscription) -> None:
     items = _items_of(subscription)
     item = items[0] if items else None
     price_id = _field(_field(item, "price"), "id")
-    plan = _field(metadata, "plan") or _plan_from_price(price_id)
+    plan = _field(metadata, "plan") or regions.plan_for_price_id(price_id)
     quantity = _field(item, "quantity")
     status = _field(subscription, "status") or "canceled"
+
+    # Read before the upsert overwrites it — this is what tells a brand new
+    # subscription apart from a renewal, proration or plan change firing the
+    # same webhook event.
+    previous = database.get_subscription(scope_type, scope_id)
+    was_active = previous is not None and previous["status"] in ACTIVE_SUBSCRIPTION_STATUSES
 
     database.upsert_subscription(
         scope_type=scope_type,
@@ -558,6 +636,38 @@ def _sync_subscription(subscription) -> None:
         and status in ACTIVE_SUBSCRIPTION_STATUSES
     ):
         database.set_org_seat_limit(scope_id, quantity)
+
+    is_active = status in ACTIVE_SUBSCRIPTION_STATUSES
+    if is_active and not was_active:
+        _notify_new_subscription(scope_type=scope_type, scope_id=scope_id, plan=plan, quantity=quantity)
+
+
+def _notify_new_subscription(
+    *, scope_type: str, scope_id: int, plan: str, quantity: Optional[int]
+) -> None:
+    """Email whoever pays for the subscription the moment it first goes live.
+
+    Fires once per subscription — see the was_active/is_active check in
+    _sync_subscription — not on every renewal or seat-count webhook.
+    """
+    if scope_type == "org":
+        org = database.get_organization(scope_id)
+        recipient = database.get_user_by_id(org["owner_user_id"]) if org else None
+    else:
+        recipient = database.get_user_by_id(scope_id)
+
+    if recipient is None:
+        logger.warning(
+            "Could not find a recipient for the new %s subscription at %s %s",
+            plan,
+            scope_type,
+            scope_id,
+        )
+        return
+
+    email_service.send_subscription_confirmation(
+        email=recipient["email"], plan=plan, seats=quantity
+    )
 
 
 def _iso_period_end(unix_ts: Optional[int]) -> Optional[str]:

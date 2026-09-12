@@ -1,10 +1,16 @@
+import hashlib
 import json
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from config import DB_PATH
+from config import (
+    DB_PATH,
+    DELETED_ACCOUNT_TOMBSTONE_HOURS,
+    DEVICE_LAST_SEEN_REFRESH_SECONDS,
+    DEVICE_SESSION_RETENTION_HOURS,
+)
 from schemas import JobCardExtraction, JobCardUpdate
 from scoping import OwnerScope
 
@@ -29,6 +35,15 @@ class NotOrgMemberError(Exception):
     pass
 
 
+class AccountDeletedError(Exception):
+    """A token belonging to an account that has been closed.
+
+    Raised instead of silently creating the row again — see the
+    deleted_accounts table. auth.get_current_user turns this into a 401, which
+    is what the app already treats as "sign in again".
+    """
+
+
 class UserNotFoundError(Exception):
     pass
 
@@ -39,6 +54,19 @@ class OwnerMustDeleteOrgError(Exception):
 
 class OwnerCannotLeaveError(Exception):
     pass
+
+
+class DeviceLimitReachedError(Exception):
+    """A device tried to sign in while the account was already at its ceiling.
+
+    Only ever raised under DEVICE_LIMIT_POLICY="reject" — the default policy
+    makes room by evicting the least recently used device instead, so this
+    never fires there.
+    """
+
+
+class DeviceSessionNotFoundError(Exception):
+    """No such device on this account, or it was already signed out."""
 
 
 def init_db() -> None:
@@ -131,6 +159,78 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL,
                 UNIQUE (scope_type, scope_id)
             )
+            """
+        )
+        # Closed accounts, kept just long enough to enforce the closure.
+        #
+        # A Firebase ID token stays cryptographically valid until it expires —
+        # up to an hour — and deleting the identity does not invalidate one
+        # already issued. get_or_create_user would happily INSERT the row
+        # straight back, so an account could be un-deleted by a token still in
+        # flight, re-storing the email of someone who had just asked for
+        # erasure. This is what makes the deletion stick.
+        #
+        # The uid is stored hashed, not raw: it only ever needs to be matched,
+        # never read back, and keeping an identifier for someone who asked to
+        # be forgotten is the thing to avoid. Rows are pruned after
+        # DELETED_ACCOUNT_TOMBSTONE_HOURS, which is well past any token's life.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS deleted_accounts (
+                uid_hash TEXT PRIMARY KEY,
+                deleted_at TEXT NOT NULL
+            )
+            """
+        )
+
+        # One row per device signed in to an account.
+        #
+        # This is the *only* server-side record that a session exists. Firebase
+        # ID tokens are minted by Firebase and verified by signature, so the
+        # backend has nothing it could revoke — without this table "sign this
+        # device out" could not mean anything until the token expired on its
+        # own, up to an hour later.
+        #
+        # device_hash, not device_id: the raw value is a per-install UUID the
+        # app sends on every request, so storing it plain would leave a
+        # ready-made cross-account device identifier in the database for
+        # anything that reads it. It only ever needs to be matched, exactly as
+        # with deleted_accounts.uid_hash.
+        #
+        # Signed-out rows are kept, not deleted, with revoked_at set: an
+        # evicted device that came back to a clean table would re-register
+        # itself on its next request and quietly undo the eviction. They are
+        # pruned after DEVICE_SESSION_RETENTION_HOURS.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS device_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                device_hash TEXT NOT NULL,
+                device_name TEXT,
+                platform TEXT,
+                created_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                revoked_at TEXT,
+                revoked_reason TEXT
+            )
+            """
+        )
+        # The uniqueness is what makes registration idempotent: a device that
+        # signs in twice updates its row rather than consuming a second slot.
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_device_sessions_user_device
+                ON device_sessions(user_id, device_hash)
+            """
+        )
+        # Every authenticated request counts the active rows for one user, so
+        # this index is on the hot path rather than a nicety.
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS ix_device_sessions_user_active
+                ON device_sessions(user_id)
+                WHERE revoked_at IS NULL
             """
         )
         conn.commit()
@@ -245,11 +345,30 @@ def _user_row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
     }
 
 
+def _uid_hash(firebase_uid: str) -> str:
+    return hashlib.sha256(firebase_uid.encode("utf-8")).hexdigest()
+
+
+def _prune_expired_tombstones(conn: sqlite3.Connection) -> None:
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=DELETED_ACCOUNT_TOMBSTONE_HOURS)
+    conn.execute("DELETE FROM deleted_accounts WHERE deleted_at < ?", (cutoff.isoformat(),))
+
+
 def get_or_create_user(firebase_uid: str, email: str) -> Dict[str, Any]:
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM users WHERE firebase_uid = ?", (firebase_uid,)).fetchone()
         if row:
             return _user_row_to_dict(row)
+
+        # Only checked on the create path. An existing user is never blocked by
+        # this, so the cost falls on first sign-in rather than every request.
+        _prune_expired_tombstones(conn)
+        if conn.execute(
+            "SELECT 1 FROM deleted_accounts WHERE uid_hash = ?", (_uid_hash(firebase_uid),)
+        ).fetchone():
+            conn.commit()
+            raise AccountDeletedError("This account has been closed")
+        conn.commit()
 
         cursor = conn.execute(
             "INSERT INTO users (firebase_uid, email, created_at) VALUES (?, ?, ?)",
@@ -270,6 +389,58 @@ def get_user_by_handle(handle: str) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM users WHERE handle = ?", (handle,)).fetchone()
         return _user_row_to_dict(row) if row else None
+
+
+def count_active_subscriptions(scope_type: str, plan: str) -> int:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS c FROM subscriptions
+            WHERE scope_type = ? AND plan = ? AND status IN ('active', 'trialing')
+            """,
+            (scope_type, plan),
+        ).fetchone()
+        return row["c"]
+
+
+def list_organizations_overview() -> List[Dict[str, Any]]:
+    """Every organization with its owner and current seat usage.
+
+    Feeds admin.py's stats for the local admin_portal.py tool. Not scoped to
+    any one shop — this is deliberately outside the ordinary per-account API
+    surface, and only ever called from a process running on the operator's
+    own machine.
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT o.id, o.name, o.seat_limit, o.owner_user_id,
+                   u.email AS owner_email, u.handle AS owner_handle,
+                   s.status AS subscription_status, s.plan AS plan
+            FROM organizations o
+            LEFT JOIN users u ON u.id = o.owner_user_id
+            LEFT JOIN subscriptions s ON s.scope_type = 'org' AND s.scope_id = o.id
+            ORDER BY o.id
+            """
+        ).fetchall()
+        overview = []
+        for row in rows:
+            seat_used = conn.execute(
+                "SELECT COUNT(*) AS c FROM users WHERE org_id = ?", (row["id"],)
+            ).fetchone()["c"]
+            overview.append(
+                {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "seat_limit": row["seat_limit"],
+                    "seat_used": seat_used,
+                    "owner_email": row["owner_email"] or "",
+                    "owner_handle": row["owner_handle"],
+                    "subscription_status": row["subscription_status"],
+                    "plan": row["plan"],
+                }
+            )
+        return overview
 
 
 def set_user_handle(user_id: int, handle: str) -> Dict[str, Any]:
@@ -338,7 +509,7 @@ def delete_user_account(user_id: int) -> Dict[str, Any]:
     """
     with get_connection() as conn:
         user = conn.execute(
-            "SELECT id, org_id, org_role FROM users WHERE id = ?", (user_id,)
+            "SELECT id, org_id, org_role, firebase_uid FROM users WHERE id = ?", (user_id,)
         ).fetchone()
         if user is None:
             raise UserNotFoundError(f"No user with id {user_id}")
@@ -370,6 +541,12 @@ def delete_user_account(user_id: int) -> Dict[str, Any]:
         conn.execute(
             "DELETE FROM subscriptions WHERE scope_type = 'user' AND scope_id = ?", (user_id,)
         )
+        # Deleted outright rather than tombstoned. The reason revoked rows
+        # normally survive is to stop a device re-registering itself, and there
+        # is no account left for it to register against — deleted_accounts
+        # already refuses the token. Keeping them would only hold on to device
+        # identifiers for someone who asked to be forgotten.
+        conn.execute("DELETE FROM device_sessions WHERE user_id = ?", (user_id,))
 
         deleted_org = None
         if org_id is not None and user["org_role"] == "owner":
@@ -384,6 +561,13 @@ def delete_user_account(user_id: int) -> Dict[str, Any]:
             conn.execute("DELETE FROM organizations WHERE id = ?", (org_id,))
 
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+        # In the same transaction as the delete: a tombstone written separately
+        # could fail on its own and leave the account re-creatable.
+        conn.execute(
+            "INSERT OR REPLACE INTO deleted_accounts (uid_hash, deleted_at) VALUES (?, ?)",
+            (_uid_hash(user["firebase_uid"]), datetime.now(timezone.utc).isoformat()),
+        )
         conn.commit()
 
     return {"jobcards": deleted_jobcards, "org_id": deleted_org}
@@ -680,3 +864,333 @@ def respond_to_invite(invite_id: int, accept: bool) -> Dict[str, Any]:
 
         row = conn.execute("SELECT * FROM invites WHERE id = ?", (invite_id,)).fetchone()
         return _invite_row_to_dict(row)
+
+
+# ── device sessions ───────────────────────────────────────────────────────
+#
+# See the device_sessions table in init_db for why this exists at all, and
+# devices.py for who is allowed how many.
+
+
+def _device_hash(device_id: str) -> str:
+    return hashlib.sha256(device_id.encode("utf-8")).hexdigest()
+
+
+def _device_row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "device_name": row["device_name"],
+        "platform": row["platform"],
+        "created_at": row["created_at"],
+        "last_seen_at": row["last_seen_at"],
+        "revoked_at": row["revoked_at"],
+    }
+
+
+def _prune_expired_device_sessions(conn: sqlite3.Connection) -> None:
+    """Forget devices signed out long enough ago that they cannot come back.
+
+    A revoked row's whole job is to answer "you were signed out" the next time
+    that device calls. Past the retention window any token it could still be
+    holding expired hours ago, so the row is just a stored device identifier
+    with no purpose left.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=DEVICE_SESSION_RETENTION_HOURS)
+    conn.execute(
+        "DELETE FROM device_sessions WHERE revoked_at IS NOT NULL AND revoked_at < ?",
+        (cutoff.isoformat(),),
+    )
+
+
+def _active_sessions(conn: sqlite3.Connection, user_id: int) -> List[sqlite3.Row]:
+    """Signed-in devices for one account, least recently used first.
+
+    The order is the eviction order. Least *recently used* rather than oldest
+    *registered*: a mechanic's daily phone can easily be the first device they
+    ever set up, and evicting by registration date would throw them off the one
+    device they actually work on to make room for a laptop they signed into
+    once.
+    """
+    return conn.execute(
+        """
+        SELECT * FROM device_sessions
+        WHERE user_id = ? AND revoked_at IS NULL
+        ORDER BY last_seen_at ASC, id ASC
+        """,
+        (user_id,),
+    ).fetchall()
+
+
+def count_active_device_sessions(user_id: int) -> int:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) AS c FROM device_sessions WHERE user_id = ? AND revoked_at IS NULL",
+            (user_id,),
+        ).fetchone()["c"]
+
+
+def list_device_sessions(user_id: int) -> List[Dict[str, Any]]:
+    """Signed-in devices, most recently used first — the order Settings shows."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM device_sessions
+            WHERE user_id = ? AND revoked_at IS NULL
+            ORDER BY last_seen_at DESC, id DESC
+            """,
+            (user_id,),
+        ).fetchall()
+        return [_device_row_to_dict(r) for r in rows]
+
+
+def register_device_session(
+    *,
+    user_id: int,
+    device_id: str,
+    device_name: Optional[str],
+    platform: Optional[str],
+    limit: int,
+    evict_oldest: bool,
+) -> Dict[str, Any]:
+    """Sign a device in, making room for it if the account is at its ceiling.
+
+    Idempotent for a device that is already signed in — it refreshes the name
+    and timestamp and consumes no extra slot, which is what lets the app call
+    this on every launch without thinking about it.
+
+    A revoked row for the same device is *revived* here rather than left alone.
+    That is the difference between this and the implicit registration in
+    `touch_device_session`: coming back through the front door (a real sign-in)
+    should work, while a background request from an evicted device should not
+    silently reinstate it.
+
+    Returns {"session": ..., "evicted": [...], "limit": ...}. `evicted` is what
+    the caller logs and what the app could show as "signed out on your other
+    device"; it is empty in the ordinary case.
+
+    Raises DeviceLimitReachedError when there is no room and `evict_oldest` is
+    False.
+    """
+    device_hash = _device_hash(device_id)
+    now = datetime.now(timezone.utc).isoformat()
+
+    with get_connection() as conn:
+        # Serialise the count-then-insert below. Without it two devices
+        # registering at the same moment both read "2 of 3 used" and both
+        # insert, putting the account one over its limit — the classic
+        # check-then-act race, and the one thing a quota must not lose.
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            _prune_expired_device_sessions(conn)
+
+            existing = conn.execute(
+                "SELECT * FROM device_sessions WHERE user_id = ? AND device_hash = ?",
+                (user_id, device_hash),
+            ).fetchone()
+
+            # Already signed in: refresh in place, no slot accounting at all.
+            if existing is not None and existing["revoked_at"] is None:
+                conn.execute(
+                    """
+                    UPDATE device_sessions
+                    SET device_name = COALESCE(?, device_name),
+                        platform = COALESCE(?, platform),
+                        last_seen_at = ?
+                    WHERE id = ?
+                    """,
+                    (device_name, platform, now, existing["id"]),
+                )
+                row = conn.execute(
+                    "SELECT * FROM device_sessions WHERE id = ?", (existing["id"],)
+                ).fetchone()
+                conn.commit()
+                return {"session": _device_row_to_dict(row), "evicted": [], "limit": limit}
+
+            # A limit of zero means no device may hold a session, so there is
+            # nothing to evict towards — evicting would clear the account and
+            # then admit the new device anyway, which is the opposite of the
+            # instruction.
+            if limit <= 0:
+                conn.rollback()
+                raise DeviceLimitReachedError("This account may not sign in on any device")
+
+            active = _active_sessions(conn, user_id)
+            evicted: List[Dict[str, Any]] = []
+
+            # `limit - 1` because the device being registered needs a slot of
+            # its own. Written as a loop rather than a single eviction so a
+            # limit that *drops* — an owner accepting an invite and becoming an
+            # employee, 3 devices down to 1 — is brought back into line in one
+            # go instead of one device per sign-in.
+            if len(active) >= limit:
+                if not evict_oldest:
+                    conn.rollback()
+                    raise DeviceLimitReachedError(
+                        f"This account is limited to {limit} "
+                        f"device{'' if limit == 1 else 's'}"
+                    )
+                for row in active[: len(active) - max(limit - 1, 0)]:
+                    conn.execute(
+                        "UPDATE device_sessions SET revoked_at = ?, revoked_reason = ? WHERE id = ?",
+                        (now, "evicted", row["id"]),
+                    )
+                    evicted.append(_device_row_to_dict(row))
+
+            if existing is not None:
+                # Revive the revoked row instead of inserting beside it — the
+                # unique index would reject a second row for the same device,
+                # and reusing it keeps created_at meaning "first seen".
+                conn.execute(
+                    """
+                    UPDATE device_sessions
+                    SET device_name = COALESCE(?, device_name),
+                        platform = COALESCE(?, platform),
+                        last_seen_at = ?,
+                        revoked_at = NULL,
+                        revoked_reason = NULL
+                    WHERE id = ?
+                    """,
+                    (device_name, platform, now, existing["id"]),
+                )
+                session_id = existing["id"]
+            else:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO device_sessions
+                        (user_id, device_hash, device_name, platform, created_at, last_seen_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (user_id, device_hash, device_name, platform, now, now),
+                )
+                session_id = cursor.lastrowid
+
+            row = conn.execute(
+                "SELECT * FROM device_sessions WHERE id = ?", (session_id,)
+            ).fetchone()
+            conn.commit()
+            return {"session": _device_row_to_dict(row), "evicted": evicted, "limit": limit}
+        except DeviceLimitReachedError:
+            raise
+        except Exception:
+            conn.rollback()
+            raise
+
+
+# What `touch_device_session` found. The caller turns these into HTTP: `active`
+# proceeds, `revoked` is a 401 that ends the session, `unknown` means register
+# it.
+DEVICE_ACTIVE = "active"
+DEVICE_REVOKED = "revoked"
+DEVICE_UNKNOWN = "unknown"
+
+
+def touch_device_session(user_id: int, device_id: str) -> str:
+    """Check a device on an authenticated request and keep its clock current.
+
+    Runs on every request, so it does as little as possible: one indexed
+    lookup, and a write only when last_seen_at has gone stale by more than
+    DEVICE_LAST_SEEN_REFRESH_SECONDS. Eviction picks the least recently used
+    device, and that choice does not get better for being accurate to the
+    second — it does get much more expensive.
+    """
+    device_hash = _device_hash(device_id)
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id, last_seen_at, revoked_at FROM device_sessions "
+            "WHERE user_id = ? AND device_hash = ?",
+            (user_id, device_hash),
+        ).fetchone()
+        if row is None:
+            return DEVICE_UNKNOWN
+        if row["revoked_at"] is not None:
+            return DEVICE_REVOKED
+
+        now = datetime.now(timezone.utc)
+        if _is_stale(row["last_seen_at"], now):
+            conn.execute(
+                "UPDATE device_sessions SET last_seen_at = ? WHERE id = ?",
+                (now.isoformat(), row["id"]),
+            )
+            conn.commit()
+        return DEVICE_ACTIVE
+
+
+def _is_stale(last_seen_at: Optional[str], now: datetime) -> bool:
+    if not last_seen_at:
+        return True
+    try:
+        parsed = datetime.fromisoformat(last_seen_at)
+    except ValueError:
+        # An unparseable timestamp would otherwise pin the row as "fresh"
+        # forever and make it un-evictable. Rewriting it repairs the row.
+        return True
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return (now - parsed).total_seconds() >= DEVICE_LAST_SEEN_REFRESH_SECONDS
+
+
+def revoke_device_session(user_id: int, session_id: int, reason: str = "manual") -> Dict[str, Any]:
+    """Sign one device out, by row id.
+
+    Scoped to `user_id` in the WHERE clause rather than checked afterwards, so
+    a guessed id belonging to someone else cannot sign out a stranger's device
+    — and is indistinguishable from an id that does not exist.
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM device_sessions WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
+            (session_id, user_id),
+        ).fetchone()
+        if row is None:
+            raise DeviceSessionNotFoundError(f"No active device session {session_id}")
+
+        conn.execute(
+            "UPDATE device_sessions SET revoked_at = ?, revoked_reason = ? WHERE id = ?",
+            (datetime.now(timezone.utc).isoformat(), reason, session_id),
+        )
+        conn.commit()
+        return _device_row_to_dict(row)
+
+
+def enforce_device_limit(user_id: int, limit: int) -> List[Dict[str, Any]]:
+    """Bring an account back within a limit that has just got smaller.
+
+    Called when a role change lowers the quota — accepting a shop invite turns
+    an account with up to three devices into an employee entitled to one. Without
+    this the extra devices would keep working until each happened to sign in
+    again, which for a tablet left signed in is never.
+
+    Returns the devices that were signed out, least recently used first.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            active = _active_sessions(conn, user_id)
+            surplus = active[: max(len(active) - max(limit, 0), 0)]
+            for row in surplus:
+                conn.execute(
+                    "UPDATE device_sessions SET revoked_at = ?, revoked_reason = ? WHERE id = ?",
+                    (now, "limit_lowered", row["id"]),
+                )
+            conn.commit()
+            return [_device_row_to_dict(r) for r in surplus]
+        except Exception:
+            conn.rollback()
+            raise
+
+
+def find_device_session(user_id: int, device_id: str) -> Optional[Dict[str, Any]]:
+    """The row for one raw device id, revoked or not.
+
+    Exists so main.py can mark "This device" in the list without being handed
+    the hashing scheme — the routes compare row ids, and the mapping from a
+    device id to a row stays here.
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM device_sessions WHERE user_id = ? AND device_hash = ?",
+            (user_id, _device_hash(device_id)),
+        ).fetchone()
+        return _device_row_to_dict(row) if row else None

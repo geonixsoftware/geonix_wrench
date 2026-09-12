@@ -1,0 +1,914 @@
+INFO:main:ALLOWED_ORIGINS is unset - using the built-in origin list: https://geonix.site, https://api.geonix.site, http://localhost:3000
+INFO:main:Serving the website from /var/www/geonix_wrench/geonix_website/dist
+INFO:     Started server process [116841]
+INFO:     Waiting for application startup.
+INFO:main:Loading Whisper model...
+INFO:httpx:HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-small/revision/main "HTTP/1.1 200 OK"
+INFO:main:Whisper model ready
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:54356 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54368 - "GET / HTTP/1.1" 200 OK
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 200 OK
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 200 OK
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 200 OK
+INFO:     217.61.226.63:0 - "GET /assets/favicon.svg?v=3 HTTP/1.1" 200 OK
+INFO:     217.61.226.63:0 - "GET /assets/apple-touch-icon.png?v=3 HTTP/1.1" 200 OK
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "HEAD /nonexistent-probe-avoid HTTP/1.1" 404 Not Found
+INFO:     17.166.21.226:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     17.166.21.226:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     17.166.24.114:0 - "GET /assets/config.js?v=1 HTTP/1.1" 200 OK
+INFO:     17.166.24.114:0 - "GET /assets/site.css?v=12 HTTP/1.1" 200 OK
+INFO:     162.62.213.165:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     2a01:4f9:6b:3025::2:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.154.250.181:0 - "GET / HTTP/1.1" 200 OK
+INFO:     66.249.72.202:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     66.249.72.200:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     66.249.72.202:0 - "GET /assets/geonix_wrench_logo_light.svg HTTP/1.1" 200 OK
+INFO:     66.249.72.200:0 - "GET /assets/site.css?v=12 HTTP/1.1" 200 OK
+INFO:     61.79.198.49:0 - "GET / HTTP/1.1" 200 OK
+INFO:     104.28.208.83:0 - "GET /wp-login.php HTTP/1.1" 404 Not Found
+INFO:     188.166.49.132:0 - "GET / HTTP/1.1" 200 OK
+INFO:     167.99.240.84:0 - "GET /wp-login.php HTTP/1.1" 404 Not Found
+INFO:     20.191.45.212:0 - "GET / HTTP/1.1" 200 OK
+INFO:     20.191.45.212:0 - "GET /favicon.ico?v=3 HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /assets/geonix_logo_light.svg HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /favicon.ico?v=3 HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /assets/apple-touch-icon.png?v=3 HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /assets/config.js?v=1 HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /assets/favicon.svg?v=3 HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /privacy/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /assets/site.css?v=12 HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     118.31.112.143:0 - "GET / HTTP/1.1" 200 OK
+INFO:     138.197.153.223:0 - "GET / HTTP/1.1" 200 OK
+INFO:     138.197.153.223:0 - "GET / HTTP/1.1" 200 OK
+INFO:     138.197.153.223:0 - "GET /wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /xmlrpc.php?rsd HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET / HTTP/1.1" 200 OK
+INFO:     138.197.153.223:0 - "GET /blog/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /web/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /wordpress/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /website/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /wp/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /news/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /2018/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /2019/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /shop/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /wp1/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /test/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /media/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /wp2/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /site/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /cms/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     138.197.153.223:0 - "GET /sito/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     66.249.72.200:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     66.249.72.200:0 - "GET /assets/geonix_logo_light.svg HTTP/1.1" 200 OK
+INFO:     187.13.217.7:0 - "GET / HTTP/1.1" 200 OK
+INFO:     98.84.1.175:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     43.133.60.94:0 - "GET / HTTP/1.1" 200 OK
+INFO:     66.249.72.206:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     66.249.72.205:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     66.249.72.205:0 - "GET /assets/site.css?v=12 HTTP/1.1" 200 OK
+INFO:     66.249.72.204:0 - "GET /assets/geonix_wrench_logo_light.svg HTTP/1.1" 304 Not Modified
+INFO:     66.249.72.205:0 - "GET /assets/config.js?v=1 HTTP/1.1" 200 OK
+INFO:     66.249.72.205:0 - "GET /assets/geonix_logo_light.svg HTTP/1.1" 304 Not Modified
+INFO:     66.249.72.204:0 - "GET /assets/favicon.svg?v=3 HTTP/1.1" 200 OK
+INFO:     66.249.72.204:0 - "GET /favicon.ico?v=3 HTTP/1.1" 200 OK
+INFO:     66.249.72.204:0 - "GET /assets/apple-touch-icon.png?v=3 HTTP/1.1" 200 OK
+INFO:     141.51.110.129:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.153.73.200:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     47.113.205.75:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.135.133.241:0 - "GET / HTTP/1.1" 200 OK
+INFO:     192.30.80.142:0 - "GET / HTTP/1.1" 200 OK
+INFO:     194.233.86.244:0 - "POST /wp-json/batch/v1 HTTP/1.1" 405 Method Not Allowed
+INFO:     194.233.86.244:0 - "POST /?rest_route=/batch/v1 HTTP/1.1" 405 Method Not Allowed
+INFO:     170.106.152.218:0 - "GET / HTTP/1.1" 200 OK
+INFO:     35.170.181.234:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     216.244.66.250:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     106.52.49.148:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET / HTTP/1.1" 200 OK
+INFO:     152.42.226.149:0 - "GET / HTTP/1.1" 200 OK
+INFO:     152.42.226.149:0 - "GET /wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /xmlrpc.php?rsd HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET / HTTP/1.1" 200 OK
+INFO:     152.42.226.149:0 - "GET /blog/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /web/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /wordpress/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /website/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /wp/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /news/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /2018/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /2019/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /shop/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /wp1/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /test/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /media/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /wp2/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /site/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /cms/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     152.42.226.149:0 - "GET /sito/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     66.249.72.200:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     66.249.72.199:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     149.57.180.48:0 - "GET / HTTP/1.1" 200 OK
+INFO:     149.57.180.48:0 - "GET /assets/config.js?v=1 HTTP/1.1" 200 OK
+INFO:     149.57.180.48:0 - "GET /assets/geonix_logo_light.svg HTTP/1.1" 200 OK
+INFO:     149.57.180.48:0 - "GET /assets/site.css?v=12 HTTP/1.1" 200 OK
+INFO:     209.99.189.119:0 - "GET / HTTP/1.1" 200 OK
+INFO:     31.135.15.61:0 - "GET / HTTP/1.1" 200 OK
+INFO:     31.135.15.61:0 - "GET / HTTP/1.1" 200 OK
+INFO:     31.135.15.61:0 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     31.135.15.61:0 - "GET /assets/favicon.svg HTTP/1.1" 200 OK
+INFO:     31.135.15.61:0 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     31.135.15.61:0 - "GET /assets/apple-touch-icon.png HTTP/1.1" 200 OK
+INFO:     31.135.15.61:0 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     31.135.15.61:0 - "GET /assets/favicon.svg HTTP/1.1" 200 OK
+INFO:     31.135.15.61:0 - "GET /assets/apple-touch-icon.png HTTP/1.1" 200 OK
+INFO:     31.135.15.61:0 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     185.130.246.205:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.166.253.94:0 - "GET / HTTP/1.1" 200 OK
+INFO:     4.43.184.113:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     114.119.129.179:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     118.31.112.143:0 - "GET / HTTP/1.1" 200 OK
+INFO:     66.249.72.205:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     66.249.72.206:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     172.56.78.169:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     43.167.239.66:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     91.67.40.29:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     188.166.222.199:0 - "GET / HTTP/1.1" 200 OK
+INFO:     188.166.222.199:0 - "GET / HTTP/1.1" 200 OK
+INFO:     188.166.222.199:0 - "GET /wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /xmlrpc.php?rsd HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET / HTTP/1.1" 200 OK
+INFO:     188.166.222.199:0 - "GET /blog/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /web/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /wordpress/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /website/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /wp/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /news/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /2020/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /2019/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /shop/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /wp1/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /test/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /wp2/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /site/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /cms/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     188.166.222.199:0 - "GET /sito/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     34.122.147.229:0 - "GET / HTTP/1.1" 200 OK
+INFO:     34.122.147.229:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     170.106.165.76:0 - "GET / HTTP/1.1" 200 OK
+INFO:     205.169.39.57:0 - "GET / HTTP/1.1" 200 OK
+INFO:     205.169.39.57:0 - "GET /assets/site.css?v=12 HTTP/1.1" 200 OK
+INFO:     205.169.39.57:0 - "GET /assets/config.js?v=1 HTTP/1.1" 200 OK
+INFO:     205.169.39.57:0 - "GET /assets/geonix_logo_light.svg HTTP/1.1" 200 OK
+INFO:     205.169.39.57:0 - "GET /assets/favicon.svg?v=3 HTTP/1.1" 200 OK
+INFO:     124.156.179.141:0 - "GET / HTTP/1.1" 200 OK
+INFO:     51.8.102.190:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     17.166.21.206:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     17.166.21.206:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     17.166.23.116:0 - "GET /assets/site.css?v=12 HTTP/1.1" 200 OK
+INFO:     17.166.20.76:0 - "GET /assets/config.js?v=1 HTTP/1.1" 200 OK
+INFO:     79.40.195.238:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     66.249.72.205:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     47.113.205.75:0 - "GET / HTTP/1.1" 200 OK
+INFO:     94.154.43.135:0 - "GET /config.json HTTP/1.1" 404 Not Found
+INFO:     170.106.35.137:0 - "GET / HTTP/1.1" 200 OK
+INFO:     147.185.132.51:0 - "GET / HTTP/1.1" 200 OK
+INFO:     60.231.91.195:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     44.195.188.79:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     66.249.72.205:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     66.249.72.205:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     101.32.208.70:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     170.106.15.3:0 - "GET / HTTP/1.1" 200 OK
+INFO:     45.74.159.42:0 - "GET / HTTP/1.1" 200 OK
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     43.165.195.234:0 - "GET / HTTP/1.1" 200 OK
+INFO:     47.113.205.75:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.217.143:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     114.119.129.179:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     2a09:bac6:5958:52d::84:8c:0 - "GET / HTTP/1.1" 200 OK
+INFO:     66.249.72.195:0 - "GET /license/ HTTP/1.1" 304 Not Modified
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     187.190.186.102:0 - "GET /privacy/ HTTP/1.1" 200 OK
+INFO:     205.210.31.25:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.134.236.36:0 - "GET / HTTP/1.1" 200 OK
+INFO:     114.119.134.12:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     119.91.20.139:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a09:bac1:b40:518::3c3:22:0 - "GET /wp-login.php HTTP/1.1" 404 Not Found
+INFO:     43.134.91.35:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     3.226.196.238:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     43.167.241.46:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.217.143:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     34.203.33.121:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     98.86.33.14:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     119.28.89.249:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     66.249.72.193:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /favicon.ico?v=3 HTTP/1.1" 304 Not Modified
+INFO:     5.102.169.29:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /privacy/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     49.51.47.100:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     43.153.19.83:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     152.53.195.17:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     194.126.177.147:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.157.150.69:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     43.130.47.33:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     2a02:c207:2345:2647::1:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a02:c207:2345:2647::1:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     2a02:c207:2345:2647::1:0 - "GET /config.json HTTP/1.1" 404 Not Found
+INFO:     2a02:c207:2345:2647::1:0 - "GET /.env.production HTTP/1.1" 404 Not Found
+INFO:     43.164.190.28:0 - "GET / HTTP/1.1" 200 OK
+INFO:     162.62.213.187:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     8.208.71.132:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.166.244.66:0 - "GET /privacy/ HTTP/1.1" 200 OK
+INFO:     43.165.197.116:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     138.197.163.56:0 - "GET / HTTP/1.1" 200 OK
+INFO:     138.197.163.56:0 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     138.197.163.56:0 - "GET / HTTP/1.1" 200 OK
+INFO:     138.197.163.56:0 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     43.157.38.131:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     43.157.174.69:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     43.155.157.239:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     216.38.230.115:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.38.230.115:0 - "GET /favicon.ico?v=3 HTTP/1.1" 200 OK
+INFO:     216.38.230.115:0 - "HEAD /sitemap.xml HTTP/1.1" 200 OK
+INFO:     43.157.148.38:0 - "GET /privacy/ HTTP/1.1" 200 OK
+INFO:     216.244.66.250:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.244.66.250:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     43.161.233.190:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     43.134.91.35:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     181.114.71.232:0 - "GET / HTTP/1.1" 200 OK
+INFO:     170.106.163.84:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     170.106.152.218:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.134.68.29:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     43.160.241.129:0 - "GET /geonixwrench/... HTTP/1.1" 404 Not Found
+INFO:     43.159.143.190:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     118.31.112.143:0 - "GET / HTTP/1.1" 200 OK
+INFO:     209.99.189.119:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.164.194.198:0 - "GET /geonixwrench/... HTTP/1.1" 404 Not Found
+INFO:     216.73.216.146:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.73.216.146:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /privacy/ HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     2a09:bac5:483:1d05::2e4:c4:0 - "GET /wp-login.php HTTP/1.1" 404 Not Found
+INFO:     52.20.51.46:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     107.21.1.152:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     216.73.217.143:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     2a13:36c0:1ff:2049::1:0 - "GET / HTTP/1.1" 200 OK
+INFO:     52.87.180.59:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     52.87.180.59:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     39.96.14.142:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.159.149.216:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /favicon.ico?v=3 HTTP/1.1" 304 Not Modified
+INFO:     5.102.169.29:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /privacy/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.102.169.29:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /assets/config.js HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /assets/favicon.svg HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /assets/site.css HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     43.164.0.96:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.166.251.233:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /assets/apple-touch-icon.png HTTP/1.1" 200 OK
+INFO:     94.154.43.74:0 - "GET /.env.local HTTP/1.1" 404 Not Found
+INFO:     43.153.135.208:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     43.153.7.191:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     167.71.6.60:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     43.134.93.164:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     43.130.40.120:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     216.73.217.143:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     43.164.3.182:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.166.128.86:0 - "GET /privacy/ HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     170.106.165.186:0 - "GET / HTTP/1.1" 200 OK
+INFO:     173.211.16.48:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.158.91.71:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     170.106.35.137:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     114.119.130.136:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     43.157.67.70:0 - "GET /geonixwrench/... HTTP/1.1" 404 Not Found
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     43.130.3.122:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     39.96.14.142:0 - "GET / HTTP/1.1" 200 OK
+INFO:     162.14.81.106:0 - "GET / HTTP/1.1" 200 OK
+INFO:     107.21.1.152:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.163.86.65:0 - "GET / HTTP/1.1" 200 OK
+INFO:     117.247.152.248:0 - "POST /xmlrpc.php HTTP/1.1" 405 Method Not Allowed
+INFO:     216.244.66.250:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     32.193.53.179:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.73.216.146:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     45.55.80.210:0 - "GET /wp-login.php HTTP/1.1" 404 Not Found
+INFO:     51.8.102.4:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     43.153.48.240:0 - "GET / HTTP/1.1" 200 OK
+INFO:     52.54.130.64:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.155.140.157:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.133.192.146:0 - "GET / HTTP/1.1" 200 OK
+INFO:     5.133.192.146:0 - "GET /favicon.ico?v=3 HTTP/1.1" 200 OK
+INFO:     98.94.3.237:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     47.113.205.75:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.166.244.192:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     43.157.50.58:0 - "GET / HTTP/1.1" 200 OK
+INFO:     193.32.162.154:0 - "GET /.git/config HTTP/1.1" 404 Not Found
+INFO:     54.146.159.153:0 - "GET / HTTP/1.1" 200 OK
+INFO:     54.146.159.153:0 - "POST / HTTP/1.1" 405 Method Not Allowed
+INFO:     45.148.10.64:0 - "GET / HTTP/1.1" 200 OK
+INFO:     45.148.10.64:0 - "GET /assets/config.js?v=1 HTTP/1.1" 200 OK
+INFO:     45.148.10.64:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /?phpinfo=1 HTTP/1.1" 200 OK
+INFO:     45.148.10.64:0 - "GET /.aws/credentials HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET //.env HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /stripe/.env HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /.stripe/ HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /aws-ses.json HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /api/.env HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /.env.bak HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /.env.aws HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /.env.save HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /test.php HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /.env.local HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /backend/.env HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /.env.backup HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /.env.tmp HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /.env.old HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /.env.php.bak HTTP/1.1" 404 Not Found
+INFO:     45.148.10.64:0 - "GET /.env.php HTTP/1.1" 404 Not Found
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     43.130.101.151:0 - "GET / HTTP/1.1" 200 OK
+INFO:     17.166.22.67:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     17.166.22.67:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     35.195.249.220:0 - "GET / HTTP/1.1" 200 OK
+INFO:     118.31.112.143:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     45.148.10.120:0 - "GET /.git/config HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET / HTTP/1.1" 200 OK
+INFO:     157.230.253.116:0 - "GET / HTTP/1.1" 200 OK
+INFO:     157.230.253.116:0 - "GET /wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /xmlrpc.php?rsd HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET / HTTP/1.1" 200 OK
+INFO:     157.230.253.116:0 - "GET /blog/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /web/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /wordpress/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /website/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /wp/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /news/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /2018/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /2019/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /shop/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /wp1/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /test/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /media/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /wp2/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /site/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /cms/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     157.230.253.116:0 - "GET /sito/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     34.74.166.124:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.217.143:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     81.171.74.60:0 - "GET / HTTP/1.1" 200 OK
+INFO:     81.171.74.60:0 - "HEAD / HTTP/1.1" 200 OK
+INFO:     81.171.74.60:0 - "POST / HTTP/1.1" 405 Method Not Allowed
+INFO:     81.171.74.60:0 - "GET /storage/logs/laravel.log HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /.git/HEAD HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /config.php HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /server.key HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /config.xml HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /dump.sql HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /backup.sql HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /database.sql HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /actuator/heapdump HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /database_backup.sql HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /backup.zip HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /.svn/wc.db HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /.ssh/id_ed25519 HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /.ssh/id_rsa HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /backup.tar.gz HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /_vti_pvt/service.pwd HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /wp-admin/setup-config.php HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /api/.env HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /docker-compose.yml HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /user_secrets.yml HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /.bash_history HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /.vscode/sftp.json HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /secrets.json HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /.npmrc HTTP/1.1" 404 Not Found
+INFO:     81.171.74.60:0 - "GET /.env.production HTTP/1.1" 404 Not Found
+INFO:     170.106.35.187:0 - "GET / HTTP/1.1" 200 OK
+INFO:     185.49.169.50:0 - "GET / HTTP/1.1" 200 OK
+INFO:     185.49.169.50:0 - "GET /favicon.ico?v=3 HTTP/1.1" 200 OK
+INFO:     185.49.169.50:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     43.157.22.109:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.135.144.126:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     74.7.175.183:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     20.191.45.212:0 - "GET / HTTP/1.1" 200 OK
+INFO:     20.191.45.212:0 - "GET /favicon.ico?v=3 HTTP/1.1" 304 Not Modified
+INFO:     34.176.230.53:0 - "GET / HTTP/1.1" 200 OK
+INFO:     34.176.230.53:0 - "GET /.git/config HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "POST / HTTP/1.1" 405 Method Not Allowed
+INFO:     34.176.230.53:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.local HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.production HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.staging HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.development HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.test HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.remote HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.bak HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.backup HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.save HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.old HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.sample HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.example HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.dev HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.prod HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.stage HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.ci HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.docker HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.live HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.preprod HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.uat HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.dist HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.swp HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env~ HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env1 HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env2 HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env_copy HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.txt HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.yaml HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.yml HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /app/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /apps/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /api/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /web/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /site/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /public/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /admin/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /backend/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /server/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /frontend/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /src/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /core/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /core/app/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /config/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /private/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /application/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /bootstrap/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /database/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /storage/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /var/www/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /var/www/html/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /current/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /release/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /releases/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /shared/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /deploy/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /build/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /dist/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /public_html/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /htdocs/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /www/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /html/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /live/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /prod/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /dev/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /staging/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /opt/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /laravel/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /symfony/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /wordpress/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /wp/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /cms/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /drupal/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /joomla/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /magento/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /shopify/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /prestashop/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /codeigniter/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /cakephp/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /zend/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /yii/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /laravel5/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /v1/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /v2/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /v3/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /api/v1/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /api/v2/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /rest/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /graphql/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /gateway/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /microservice/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /service/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /api/v3/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /api/dev/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /api/staging/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /vendor/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /lib/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /resources/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /assets/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /uploads/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /internal/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /tools/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /scripts/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /bin/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /sbin/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /local/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /portal/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /dashboard/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /panel/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /crm/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /erp/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /shop/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /store/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /saas/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /client/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /project/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /admin-panel/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /control-panel/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /user-panel/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /node/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /express/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /next/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /nuxt/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /nest/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /react/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /vue/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /angular/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /svelte/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /vite/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /backup/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /backups/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /old/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /tmp/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /temp/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /lab/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /cronlab/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /cron/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /en/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /administrator/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /psnlink/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /exapi/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /sitemaps/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.backup1 HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.env.backup2 HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /logs/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /cache/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /mailer/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /mail/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /email/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /smtp/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /mailing/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /notifications/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /notify/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /sender/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /campaign/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /newsletter/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /ses/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /sendgrid/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /sparkpost/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /postmark/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /mailgun/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /mandrill/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /mailjet/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /brevo/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /transactional/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /bulk/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /aws/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /azure/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /gcp/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /cloud/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /infrastructure/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /docker/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /k8s/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /kubernetes/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /terraform/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /ansible/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.git/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /ci/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /cd/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /jenkins/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /gitlab/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /github/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /actions/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /circleci/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /travis/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /buildkite/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /mysql/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /postgres/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /mongodb/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /redis/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /elasticsearch/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /rabbitmq/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /kafka/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /queue/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /worker/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /job/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /test/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /qa/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /preview/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /beta/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /uat/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /stage/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /development/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /production/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /config/app/.env HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /info.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /php.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /i.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /pi.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /pinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /test.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /phpinfo HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /p.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /debug.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /admin/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /test/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /dev/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /old/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /tmp/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /public/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /info HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /php-info.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /phpversion.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /_phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /old_phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /server-info.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /server-status.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /_profiler/phpinfo HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /_environment HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /webroot/index.php/_environment HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /mail/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /cpanel/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /hosting/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /webmail/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /smtp/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /phpinfo.php.bak HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /phpinfo.php.old HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /phpinfo.php~ HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /info.php.bak HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /phpinfo.php.save HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /staging/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /beta/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /uat/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /qa/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /preview/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /www/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /htdocs/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /public_html/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /site/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /docs/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /wp-admin/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /administrator/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /core/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /includes/phpinfo.php HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /service-account.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /sa.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /gcp-key.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /gcp-credentials.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /gcp-sa.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /credentials.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /google-credentials.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /google-key.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /.config/gcloud/application_default_credentials.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /application_default_credentials.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /key.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /keyfile.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /firebase-adminsdk.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET /firebase-key.json HTTP/1.1" 404 Not Found
+INFO:     34.176.230.53:0 - "GET / HTTP/1.1" 200 OK
+INFO:     66.249.68.64:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     66.249.68.70:0 - "GET / HTTP/1.1" 200 OK
+INFO:     66.249.68.70:0 - "GET /assets/config.js?v=1 HTTP/1.1" 200 OK
+INFO:     66.249.68.70:0 - "GET /assets/geonix_logo_light.svg HTTP/1.1" 200 OK
+INFO:     66.249.68.71:0 - "GET /assets/site.css?v=12 HTTP/1.1" 200 OK
+INFO:     116.202.235.23:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     116.202.235.23:0 - "GET / HTTP/1.1" 200 OK
+INFO:     198.235.24.148:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     43.135.133.241:0 - "GET / HTTP/1.1" 200 OK
+INFO:     40.88.21.235:0 - "GET / HTTP/1.1" 200 OK
+INFO:     40.88.21.235:0 - "GET /favicon.ico?v=3 HTTP/1.1" 200 OK
+INFO:     216.38.230.123:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.38.230.123:0 - "GET /favicon.ico?v=3 HTTP/1.1" 304 Not Modified
+INFO:     216.38.230.123:0 - "HEAD /sitemap.xml HTTP/1.1" 200 OK
+INFO:     136.67.184.0:0 - "GET /wp-login.php HTTP/1.1" 404 Not Found
+INFO:     66.249.68.66:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     216.73.217.143:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     47.113.205.75:0 - "GET / HTTP/1.1" 200 OK
+INFO:     66.249.68.136:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     66.249.68.136:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     2a01:4f9:2b:2b8b::2:0 - "GET / HTTP/1.1" 200 OK
+INFO:     98.88.179.50:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     139.155.126.16:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.130.141.193:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a09:bac5:487:1d05::2e4:110:0 - "GET /wp-login.php HTTP/1.1" 404 Not Found
+INFO:     209.99.189.119:0 - "GET / HTTP/1.1" 200 OK
+INFO:     20.191.45.212:0 - "GET / HTTP/1.1" 200 OK
+INFO:     20.191.45.212:0 - "GET /favicon.ico?v=3 HTTP/1.1" 304 Not Modified
+INFO:     34.75.251.35:0 - "GET /wp-login.php HTTP/1.1" 404 Not Found
+INFO:     94.154.43.122:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     216.73.217.143:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     162.62.213.187:0 - "GET / HTTP/1.1" 200 OK
+INFO:     206.189.135.231:0 - "GET / HTTP/1.1" 200 OK
+INFO:     206.189.135.231:0 - "GET / HTTP/1.1" 200 OK
+INFO:     206.189.135.231:0 - "GET /wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /xmlrpc.php?rsd HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET / HTTP/1.1" 200 OK
+INFO:     206.189.135.231:0 - "GET /blog/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /web/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /wordpress/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /website/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /wp/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /news/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /2018/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /2019/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /shop/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /wp1/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /test/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /media/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /wp2/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /site/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /cms/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     206.189.135.231:0 - "GET /sito/wp-includes/wlwmanifest.xml HTTP/1.1" 404 Not Found
+INFO:     8.208.71.132:0 - "GET / HTTP/1.1" 200 OK
+INFO:     49.51.195.195:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     138.246.253.24:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     66.249.68.136:0 - "GET /terms/ HTTP/1.1" 304 Not Modified
+INFO:     91.98.176.10:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     116.202.235.23:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     116.202.235.23:0 - "GET /docs/ HTTP/1.1" 200 OK
+INFO:     116.202.235.23:0 - "GET /terms/ HTTP/1.1" 200 OK
+INFO:     116.202.235.23:0 - "GET /readme/ HTTP/1.1" 200 OK
+INFO:     116.202.235.23:0 - "GET /license/ HTTP/1.1" 200 OK
+INFO:     46.244.69.227:0 - "POST /xmlrpc.php HTTP/1.1" 405 Method Not Allowed
+INFO:     8.208.71.132:0 - "GET / HTTP/1.1" 200 OK
+INFO:     66.249.68.135:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     66.249.68.136:0 - "GET /geonixwrench/ HTTP/1.1" 304 Not Modified
+INFO:     23.95.219.38:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     216.73.216.146:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     34.193.242.118:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     170.106.181.163:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     216.244.66.250:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.244.66.250:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     43.156.228.27:0 - "GET / HTTP/1.1" 200 OK
+INFO:     66.249.68.135:0 - "GET /readme/ HTTP/1.1" 304 Not Modified
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     216.73.217.143:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     209.99.189.119:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.166.130.123:0 - "GET / HTTP/1.1" 200 OK
+INFO:     39.96.14.142:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.130.72.40:0 - "GET / HTTP/1.1" 200 OK
+INFO:     104.253.228.181:0 - "GET / HTTP/1.1" 200 OK
+INFO:     67.230.43.159:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     43.155.140.157:0 - "GET / HTTP/1.1" 200 OK
+INFO:     146.112.163.60:0 - "GET / HTTP/1.1" 200 OK
+INFO:     146.112.163.60:0 - "GET /assets/site.css?v=12 HTTP/1.1" 200 OK
+INFO:     146.112.163.60:0 - "GET /assets/geonix_logo_light.svg HTTP/1.1" 200 OK
+INFO:     146.112.163.60:0 - "GET /assets/config.js?v=1 HTTP/1.1" 200 OK
+INFO:     146.112.163.60:0 - "GET /assets/favicon.svg?v=3 HTTP/1.1" 200 OK
+INFO:     209.99.189.119:0 - "GET / HTTP/1.1" 200 OK
+INFO:     209.99.189.119:0 - "GET / HTTP/1.1" 200 OK
+INFO:     47.103.152.97:0 - "GET /.git/config HTTP/1.1" 404 Not Found
+INFO:     103.214.20.135:0 - "GET /.env.local HTTP/1.1" 404 Not Found
+INFO:     39.105.27.30:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     43.138.68.113:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     205.169.39.188:0 - "GET / HTTP/1.1" 200 OK
+INFO:     205.169.39.188:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a09:bac1:b40:518::1f1:1fd:0 - "GET /wp-login.php HTTP/1.1" 404 Not Found
+INFO:     51.8.102.226:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     74.7.175.183:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     118.31.112.143:0 - "GET / HTTP/1.1" 200 OK
+INFO:     124.156.226.179:0 - "GET / HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     216.73.216.146:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     43.165.174.53:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.153.48.240:0 - "GET / HTTP/1.1" 200 OK
+INFO:     162.243.82.110:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     39.96.14.142:0 - "GET / HTTP/1.1" 200 OK
+INFO:     43.135.144.81:0 - "GET / HTTP/1.1" 200 OK
+INFO:     205.210.31.107:0 - "GET / HTTP/1.1" 200 OK
+INFO:     114.119.133.208:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     216.73.217.143:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     43.157.172.39:0 - "GET / HTTP/1.1" 200 OK
+INFO:     216.73.216.146:0 - "GET /sitemap.xml HTTP/1.1" 200 OK
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     43.165.195.234:0 - "GET / HTTP/1.1" 200 OK
+INFO:     31.221.250.8:0 - "GET / HTTP/1.1" 200 OK
+INFO:     31.221.250.8:0 - "GET /geonixwrench/ HTTP/1.1" 200 OK
+INFO:     20.191.45.212:0 - "GET / HTTP/1.1" 200 OK
+INFO:     20.191.45.212:0 - "GET /favicon.ico?v=3 HTTP/1.1" 304 Not Modified
+INFO:     43.153.135.208:0 - "GET / HTTP/1.1" 200 OK
+INFO:     54.152.198.76:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     94.154.43.84:0 - "GET / HTTP/1.1" 200 OK
+INFO:     8.208.71.132:0 - "GET / HTTP/1.1" 200 OK
+INFO:     74.7.175.183:0 - "GET /robots.txt HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     2a06:98c0:3600::103:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     40.77.167.203:0 - "GET /robots.txt HTTP/1.1" 200 OK
+INFO:     43.130.67.6:0 - "GET / HTTP/1.1" 200 OK
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     217.61.226.63:0 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [116841]

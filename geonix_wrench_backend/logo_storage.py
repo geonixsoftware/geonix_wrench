@@ -35,10 +35,16 @@ _STORED_EXTENSIONS = (PNG_EXTENSION, SVG_EXTENSION)
 # A shop logo needs none of these.
 _SVG_SNIFF_BYTES = 2048
 _SVG_FORBIDDEN = re.compile(rb"<!DOCTYPE|<!ENTITY|<script|<foreignObject", re.IGNORECASE)
+# Any scheme that leaves the document or executes: network, file, and the two
+# that make a link run code. `javascript:` and `data:` used to pass because
+# only network schemes were listed.
 _SVG_REMOTE_REF = re.compile(
-    rb"""(?:xlink:)?href\s*=\s*["']?\s*(?:https?:|ftp:|file:|//)""", re.IGNORECASE
+    rb"""(?:xlink:)?href\s*=\s*["']?\s*(?:https?:|ftp:|file:|javascript:|data:|vbscript:|//)""",
+    re.IGNORECASE,
 )
-_SVG_EVENT_HANDLER = re.compile(rb"""\son[a-z]+\s*=\s*["']""", re.IGNORECASE)
+# The quote is optional: `onload=alert(1)` with no quotes is valid markup and
+# used to slip past a pattern that required one.
+_SVG_EVENT_HANDLER = re.compile(rb"""[\s"'/]on[a-z]+\s*=""", re.IGNORECASE)
 
 
 def _logo_path(owner: OwnerScope, extension: str) -> str:
@@ -63,8 +69,15 @@ def get_active_logo_path(owner: OwnerScope) -> str:
 
 
 def looks_like_svg(data: bytes) -> bool:
-    head = data[:_SVG_SNIFF_BYTES].lstrip()
-    return head.startswith(b"<?xml") or head.startswith(b"<svg") or b"<svg" in head
+    """SVG if it starts as XML. Only the start: a raster file that happens
+    to carry the bytes "<svg" in a metadata chunk is still a raster file, and
+    the old any-occurrence test sent such a PNG down the SVG path to be
+    rejected as an invalid SVG."""
+    head = data[:_SVG_SNIFF_BYTES]
+    if head.startswith(b"\xef\xbb\xbf"):  # UTF-8 byte-order mark
+        head = head[3:]
+    head = head.lstrip()
+    return head.startswith(b"<?xml") or head.startswith(b"<svg") or head.startswith(b"<!--")
 
 
 def _validated_svg(data: bytes) -> bytes:

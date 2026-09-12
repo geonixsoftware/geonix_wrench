@@ -119,3 +119,49 @@ def test_unparseable_svg_is_refused(storage):
 def test_non_image_is_refused(storage):
     with pytest.raises(logo_storage.InvalidLogoError):
         logo_storage.save_shop_logo(b"\x00\x01\x02 not an image", storage)
+
+
+@pytest.mark.parametrize(
+    "name, payload",
+    [
+        (
+            # No quotes around the handler value: valid markup, and the old
+            # pattern required a quote so this walked straight past it.
+            "unquoted_event_handler",
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" '
+            b"onload=alert(1)><rect width=\"5\" height=\"5\"/></svg>",
+        ),
+        (
+            "javascript_href",
+            b'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
+            b'width="10" height="10"><a xlink:href="javascript:alert(1)">'
+            b'<rect width="5" height="5"/></a></svg>',
+        ),
+        (
+            "data_href",
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">'
+            b'<image href="data:text/html,<script>alert(1)</script>"/></svg>',
+        ),
+    ],
+)
+def test_hostile_svg_variants_are_refused(storage, name, payload):
+    with pytest.raises(logo_storage.InvalidLogoError):
+        logo_storage.save_shop_logo(payload, storage)
+
+
+def test_a_png_that_mentions_svg_in_its_metadata_is_still_a_png(storage):
+    # looks_like_svg used to accept "<svg" anywhere in the first 2 KB, which
+    # sent a perfectly good raster down the SVG path to be rejected.
+    from PIL import PngImagePlugin
+
+    image = Image.new("RGB", (10, 10), "white")
+    meta = PngImagePlugin.PngInfo()
+    meta.add_text("Comment", "exported from <svg> source")
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", pnginfo=meta)
+    data = buffer.getvalue()
+    assert b"<svg" in data[:2048]
+
+    assert not logo_storage.looks_like_svg(data)
+    logo_storage.save_shop_logo(data, storage)
+    assert logo_storage.get_active_logo_path(storage).endswith(".png")

@@ -4,10 +4,18 @@
 #   sudo systemctl daemon-reload && sudo systemctl enable --now geonix-wrench
 #
 # Assumes the repo at /opt/geonix-wrench with a venv beside it, owned by a
-# service user that is not root:
+# service user that is not root, and a separate writable data directory:
 #   sudo useradd --system --home /opt/geonix-wrench wrench
 #   sudo -u wrench python3 -m venv /opt/geonix-wrench/venv
 #   sudo -u wrench /opt/geonix-wrench/venv/bin/pip install -r requirements.txt
+#   sudo install -d -o wrench -g wrench -m 750 /var/lib/geonix-wrench
+#
+# The data directory is the only place this unit may write (ProtectSystem=
+# strict below makes everything else read-only), so the database, logos and
+# the Whisper model cache are all pointed at it here. Without those three
+# settings config.py's defaults are *relative* paths, resolved against the
+# working directory under /opt — which is read-only, so the service would
+# load the model for minutes and then die on the first database write.
 #
 # ffmpeg must be installed system-wide (apt install ffmpeg) — faster-whisper
 # shells out to it for every recording the app sends.
@@ -26,6 +34,11 @@ User=wrench
 Group=wrench
 WorkingDirectory=/opt/geonix-wrench/geonix_wrench_backend
 EnvironmentFile=/opt/geonix-wrench/geonix_wrench_backend/.env
+# After EnvironmentFile on purpose: these must win over any relative path
+# left in .env, or the write lands on the read-only tree.
+Environment=DB_PATH=/var/lib/geonix-wrench/geonix_wrench.db
+Environment=LOGO_STORAGE_DIR=/var/lib/geonix-wrench/logos
+Environment=HF_HOME=/var/lib/geonix-wrench/models
 ExecStart=/opt/geonix-wrench/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
 
 Restart=always

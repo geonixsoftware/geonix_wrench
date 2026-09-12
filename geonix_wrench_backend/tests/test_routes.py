@@ -87,8 +87,11 @@ def test_invite_and_accept_flow(temp_db):
 
 
 def test_jobcards_list_scoping_via_two_users(temp_db):
+    from conftest import activate
+
     u1 = _make_user("jc1@example.com")
     u2 = _make_user("jc2@example.com")
+    activate(u1)
 
     client = _make_client(temp_db, u1["id"])
     resp = client.patch("/api/jobcards/1", json={"labor_rate": 50.0})
